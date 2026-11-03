@@ -449,6 +449,27 @@ impl Game {
             let f = if l.kind == 0 { Font::BigCenter } else { Font::NormalCenter };
             tq.add(l.text, x - 120.0, y - 14.0, 240.0, 28.0, f, c);
         }
+        // 建物の種類（工房と弾薬工場、補給所と港は絵が同じなので文字で分ける）
+        if z >= 3.5 {
+            for b in &w.blds {
+                if self.viewer.is_some_and(|v| b.side != v && !b.seen[v as usize]) {
+                    continue;
+                }
+                let (x, y) = self.world_to_screen(g, b.x, b.y);
+                if vis(x, y) {
+                    let s = match b.kind {
+                        BK::Base => "基",
+                        BK::Airfield => "飛",
+                        BK::Workshop => "工",
+                        BK::Factory => "弾",
+                        BK::Depot => "補",
+                        BK::Port => "港",
+                    };
+                    let yoff = (0.95 * z).max(9.0) + 5.0;
+                    tq.shadow(s, x - 12.0, y + yoff, 24.0, 20.0, Font::NormalCenter, [1.0, 1.0, 1.0, 0.95]);
+                }
+            }
+        }
     }
 
     fn draw_marquee(&mut self, g: &mut dyn Gfx) {

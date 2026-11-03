@@ -366,6 +366,8 @@ impl Game {
                     let bsz = s * 2.8;
                     g.draw_textured(tex, b.x - bsz * 0.5, b.y - bsz * 0.65, b.x + bsz * 0.5, b.y + bsz * 0.35, [1.0, 1.0, 1.0, a], true);
                 }
+                // 絵の上から陣営色の枠を描き直す
+                g.rect_outline(b.x - s, b.y - s, b.x + s, b.y + s, s * 0.14, [c[0], c[1], c[2], a]);
             }
             let f = (b.hp / b.max_hp).clamp(0.0, 1.0);
             if f < 0.999 {
@@ -423,7 +425,10 @@ impl Game {
                 let drawn_sprite = if z >= 3.5 {
                     if let Some(tex) = self.art.unit_texture(g, u.kind) {
                         let sz = s * 2.4;
+                        // 絵は両軍共通なので、足元の円と外周の輪で陣営を示す
+                        g.circle(u.x, u.y, s * 1.2, 16, [c[0], c[1], c[2], 0.4]);
                         g.draw_textured(tex, u.x - sz * 0.5, u.y - sz * 0.5, u.x + sz * 0.5, u.y + sz * 0.5, [1.0, 1.0, 1.0, 1.0], true);
+                        g.ring(u.x, u.y, s * 1.2, s * 0.13, 16, c);
                         true
                     } else {
                         false
