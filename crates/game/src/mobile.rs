@@ -128,9 +128,20 @@ impl Game {
         let mut tq = TextQ::default();
         // 記録画面が開いているときは、後ろのボタンを押せないようにする
         let press = if self.show_save { self.pressed.take() } else { None };
-        g.rect(0.0, 0.0, sw, sh, [0.06, 0.075, 0.09, 1.0]);
-        g.tri((0.0, 0.0), (sw * 0.42, 0.0), (0.0, sh), [0.16, 0.3, 0.55, 0.45]);
-        g.tri((sw, sh), (sw * 0.58, sh), (sw, 0.0), [0.55, 0.14, 0.12, 0.45]);
+
+        // 背景：シネマティックアート（title.rgba）を全画面アスペクト比カバーで描画
+        let title_tex = self.art.ensure_title(g);
+        let aspect = 16.0 / 9.0;
+        let (tw, th) = if sw / sh > aspect {
+            (sw, sw / aspect)
+        } else {
+            (sh * aspect, sh)
+        };
+        let (tx0, ty0) = ((sw - tw) / 2.0, (sh - th) / 2.0);
+        g.draw_textured(title_tex, tx0, ty0, tx0 + tw, ty0 + th, [0.85, 0.85, 0.85, 1.0], true);
+        g.rect(0.0, 0.0, sw, sh, [0.03, 0.04, 0.06, 0.62]);
+        g.tri((0.0, 0.0), (sw * 0.42, 0.0), (0.0, sh), [0.12, 0.25, 0.5, 0.4]);
+        g.tri((sw, sh), (sw * 0.58, sh), (sw, 0.0), [0.5, 0.12, 0.1, 0.4]);
         let cx = sw / 2.0;
         // タブレットでは縦に余るので真ん中に寄せる
         let mut y = ((sh - 400.0) / 2.0).max(4.0);

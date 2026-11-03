@@ -145,18 +145,30 @@ impl Game {
         let mut tq = TextQ::default();
         // 記録画面が開いているときは、後ろのボタンを押せないようにする
         let press = if self.show_save { self.pressed.take() } else { None };
-        // 背景：等高線風の格子とふたつの陣営色
-        g.rect(0.0, 0.0, sw, sh, [0.06, 0.075, 0.09, 1.0]);
-        g.tri((0.0, 0.0), (sw * 0.42, 0.0), (0.0, sh), [0.16, 0.3, 0.55, 0.45]);
-        g.tri((sw, sh), (sw * 0.58, sh), (sw, 0.0), [0.55, 0.14, 0.12, 0.45]);
+
+        // 背景：シネマティックアート（title.rgba）を全画面アスペクト比カバーで描画
+        let title_tex = self.art.ensure_title(g);
+        let aspect = 16.0 / 9.0;
+        let (tw, th) = if sw / sh > aspect {
+            (sw, sw / aspect)
+        } else {
+            (sh * aspect, sh)
+        };
+        let (tx0, ty0) = ((sw - tw) / 2.0, (sh - th) / 2.0);
+        g.draw_textured(title_tex, tx0, ty0, tx0 + tw, ty0 + th, [0.85, 0.85, 0.85, 1.0], true);
+        // 暗めのグラデーションと陣営アクセントオーバーレイ
+        g.rect(0.0, 0.0, sw, sh, [0.03, 0.04, 0.06, 0.58]);
+        g.tri((0.0, 0.0), (sw * 0.42, 0.0), (0.0, sh), [0.12, 0.25, 0.5, 0.4]);
+        g.tri((sw, sh), (sw * 0.58, sh), (sw, 0.0), [0.5, 0.12, 0.1, 0.4]);
+
         let mut gx = 0.0;
         while gx < sw {
-            g.rect(gx, 0.0, gx + 1.0, sh, [1.0, 1.0, 1.0, 0.025]);
+            g.rect(gx, 0.0, gx + 1.0, sh, [1.0, 1.0, 1.0, 0.02]);
             gx += 48.0;
         }
         let mut gy = 0.0;
         while gy < sh {
-            g.rect(0.0, gy, sw, gy + 1.0, [1.0, 1.0, 1.0, 0.025]);
+            g.rect(0.0, gy, sw, gy + 1.0, [1.0, 1.0, 1.0, 0.02]);
             gy += 48.0;
         }
         // 飛び交うドローン
@@ -344,6 +356,50 @@ impl Game {
         if self.modal_open() {
             self.close_button_draw(g, &mut tq);
         }
+        if !self.modal_open() && self.tip.is_none() && !self.over_ui(g, self.mouse.0, self.mouse.1) {
+            let (mx, my) = self.screen_to_world(g, self.mouse.0, self.mouse.1);
+            if let Some(w) = self.world.as_ref() {
+                for c in &w.map.cities {
+                    let d = ((c.x - mx).powi(2) + (c.y - my).powi(2)).sqrt();
+                    let hit_r = (1.2 + c.value as f32 * 0.25).max(1.5);
+                    if d <= hit_r {
+                        let kind_str = if c.value >= 5 {
+                            "首都 / 司令部中枢"
+                        } else if c.port {
+                            "重要軍港 / 補給港湾"
+                        } else if c.value >= 4 {
+                            "主要工業拠点 / 重工業都市"
+                        } else {
+                            "前線拠点 / 交通結節点"
+                        };
+                        let owner_str = SIDE_NAMES[c.owner as usize];
+                        self.tip = Some(format!(
+                            "【{}】 {}\n支配: {}\n戦略価値: ★{}\n都市経済貢献: +{:.1}/s",
+                            c.name, kind_str, owner_str, c.value, c.value as f32 * 0.65
+                        ));
+                        break;
+                    }
+                }
+                if self.tip.is_none() {
+                    for b in &w.blds {
+                        if self.viewer.is_some_and(|v| b.side != v && !b.seen[v as usize]) {
+                            continue;
+                        }
+                        let d = ((b.x - mx).powi(2) + (b.y - my).powi(2)).sqrt();
+                        if d <= 1.4 {
+                            let bd = bdef(b.kind);
+                            let owner_str = SIDE_NAMES[b.side as usize];
+                            let st = if b.building > 0.0 { " [建設中]" } else { "" };
+                            self.tip = Some(format!(
+                                "【{}】{}\n所属: {}\n耐久: {:.0}/{:.0}\n{}",
+                                bd.name, st, owner_str, b.hp, b.max_hp, bd.desc
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         self.draw_tip(g, &mut tq, sw, sh);
         tq.flush(g);
     }
@@ -367,10 +423,19 @@ impl Game {
             }
             let (x, y) = self.world_to_screen(g, c.x, c.y);
             if vis(x, y) {
-                tq.shadow(c.name, x - 60.0, y + 9.0, 120.0, 18.0, Font::NormalCenter, [1.0, 0.98, 0.9, 1.0]);
+                let yoff = if z >= 3.0 { (1.8 + c.value as f32 * 0.4).min(3.8) * 0.33 * z + 4.0 } else { 9.0 };
+                tq.shadow(c.name, x - 60.0, y + yoff, 120.0, 18.0, Font::NormalCenter, [1.0, 0.98, 0.9, 1.0]);
             }
         }
         for l in &w.map.labels {
+            if z >= 3.0 && (l.kind == 0 || l.kind == 3) {
+                // 拡大戦術ビューでは国家名などの大文字が部隊や拠点と重ならないよう非表示
+                continue;
+            }
+            if z >= 4.5 {
+                // 最大拡大時は戦術戦闘に専念できるよう広域地名ラベルを非表示
+                continue;
+            }
             let (x, y) = self.world_to_screen(g, l.x, l.y);
             if !vis(x, y) {
                 continue;
@@ -383,26 +448,6 @@ impl Game {
             };
             let f = if l.kind == 0 { Font::BigCenter } else { Font::NormalCenter };
             tq.add(l.text, x - 120.0, y - 14.0, 240.0, 28.0, f, c);
-        }
-        // 建物の文字
-        if z >= 3.5 {
-            for b in &w.blds {
-                if self.viewer.is_some_and(|v| b.side != v && !b.seen[v as usize]) {
-                    continue;
-                }
-                let (x, y) = self.world_to_screen(g, b.x, b.y);
-                if vis(x, y) {
-                    let s = match b.kind {
-                        BK::Base => "基",
-                        BK::Airfield => "飛",
-                        BK::Workshop => "工",
-                        BK::Factory => "弾",
-                        BK::Depot => "補",
-                        BK::Port => "港",
-                    };
-                    tq.add(s, x - 12.0, y - 12.0, 24.0, 24.0, Font::NormalCenter, [1.0, 1.0, 1.0, 0.95]);
-                }
-            }
         }
     }
 
@@ -589,9 +634,10 @@ impl Game {
             let info = self.world.as_ref().and_then(|w| w.bld(bid)).map(|b| (b.kind, b.hp, b.max_hp, b.building, b.queue.iter().copied().collect::<Vec<_>>(), b.prog));
             if let Some((k, hp, max, building, queue, prog)) = info {
                 let d = bdef(k);
-                tq.add(d.name, x + 10.0, y + 6.0, w0 - 20.0, 26.0, Font::Big, TEXT);
-                tq.add(format!("耐久 {:.0}/{:.0}", hp, max), x + 10.0, y + 34.0, w0 - 20.0, 22.0, Font::Normal, DIM);
-                tq.add(d.desc, x + 10.0, y + 56.0, w0 - 20.0, 40.0, Font::Small, DIM);
+                self.art.draw_bld_sprite(g, k, x + w0 - 36.0, y + 36.0, 52.0, [1.0; 4]);
+                tq.add(d.name, x + 10.0, y + 6.0, w0 - 70.0, 26.0, Font::Big, TEXT);
+                tq.add(format!("耐久 {:.0}/{:.0}", hp, max), x + 10.0, y + 34.0, w0 - 70.0, 22.0, Font::Normal, DIM);
+                tq.add(d.desc, x + 10.0, y + 56.0, w0 - 70.0, 40.0, Font::Small, DIM);
                 if building > 0.0 {
                     tq.add(format!("建設中… 残り {building:.0} 秒"), x + 10.0, y + 100.0, w0 - 20.0, 22.0, Font::Normal, ACCENT);
                 } else if !queue.is_empty() {
@@ -632,8 +678,9 @@ impl Game {
         let name = if single { d.names[side as usize].to_string() } else { format!("{} 部隊を選択中", sel.len()) };
         tq.add(name, x + 10.0, y + 4.0, w0 - 20.0, 26.0, Font::Big, TEXT);
         if single {
-            tq.add(format!("耐久 {:.0}/{:.0}{}{}", sel[0].1, d.hp, if sel[0].2 { "　AI委任中" } else { "" }, if !sel[0].3 { "　補給切れ" } else { "" }), x + 10.0, y + 30.0, w0 - 20.0, 22.0, Font::Small, if sel[0].3 { DIM } else { BAD });
-            tq.add(d.desc, x + 10.0, y + 50.0, w0 - 20.0, 40.0, Font::Small, DIM);
+            self.art.draw_unit_sprite(g, first, x + w0 - 36.0, y + 40.0, 52.0, [1.0; 4]);
+            tq.add(format!("耐久 {:.0}/{:.0}{}{}", sel[0].1, d.hp, if sel[0].2 { "　AI委任中" } else { "" }, if !sel[0].3 { "　補給切れ" } else { "" }), x + 10.0, y + 30.0, w0 - 70.0, 22.0, Font::Small, if sel[0].3 { DIM } else { BAD });
+            tq.add(d.desc, x + 10.0, y + 50.0, w0 - 70.0, 40.0, Font::Small, DIM);
         } else {
             let mut ix = x + 10.0;
             let mut iy = y + 34.0;
@@ -642,7 +689,9 @@ impl Game {
                 if c == 0 {
                     continue;
                 }
-                draw_unit_icon(g, k, ix + 12.0, iy + 12.0, -0.6, 8.0, SIDE_COL[side as usize], self.clock);
+                if !self.art.draw_unit_sprite(g, k, ix + 12.0, iy + 12.0, 24.0, [1.0; 4]) {
+                    draw_unit_icon(g, k, ix + 12.0, iy + 12.0, -0.6, 8.0, SIDE_COL[side as usize], self.clock);
+                }
                 tq.add(format!("{c}"), ix + 22.0, iy + 4.0, 24.0, 20.0, Font::Small, TEXT);
                 ix += 46.0;
                 if ix > x + w0 - 50.0 {
@@ -693,7 +742,9 @@ impl Game {
                 g.rect(cx, cy, cx + bw, cy + bh, if hover { [0.2, 0.23, 0.27, 1.0] } else { PANEL2 });
                 g.rect_outline(cx, cy, cx + bw, cy + bh, 1.0, LINE);
                 let col = if afford { SIDE_COL[side as usize] } else { [0.45, 0.47, 0.5, 1.0] };
-                draw_unit_icon(g, *k, cx + 22.0, cy + 26.0, -0.5, 14.0, col, self.clock);
+                if !self.art.draw_unit_sprite(g, *k, cx + 22.0, cy + 24.0, 32.0, if afford { [1.0, 1.0, 1.0, 1.0] } else { [0.45, 0.47, 0.5, 0.7] }) {
+                    draw_unit_icon(g, *k, cx + 22.0, cy + 26.0, -0.5, 14.0, col, self.clock);
+                }
                 tq.add(d.short, cx + 42.0, cy + 6.0, bw - 44.0, 20.0, Font::Normal, if afford { TEXT } else { DIM });
                 tq.add(format!("{cost:.0}"), cx + 42.0, cy + 28.0, bw - 44.0, 20.0, Font::Small, if afford { ACCENT } else { BAD });
                 let q = self.world.as_ref().map_or(0, |w| w.queued_count(side, *k));
@@ -740,8 +791,10 @@ impl Game {
                 let hover = inside(self.mouse, cx, cy, cx + bw, cy + bh);
                 g.rect(cx, cy, cx + bw, cy + bh, if on { [0.28, 0.34, 0.2, 1.0] } else if hover { [0.2, 0.23, 0.27, 1.0] } else { PANEL2 });
                 g.rect_outline(cx, cy, cx + bw, cy + bh, 1.0, if on { ACCENT } else { LINE });
-                tq.add(d.name, cx + 6.0, cy + 8.0, bw - 10.0, 22.0, Font::Normal, if afford { TEXT } else { DIM });
-                tq.add(format!("{:.0}", d.cost), cx + 6.0, cy + 32.0, bw - 10.0, 20.0, Font::Small, if afford { ACCENT } else { BAD });
+                let bcol = if afford { [1.0, 1.0, 1.0, 1.0] } else { [0.45, 0.47, 0.5, 0.7] };
+                self.art.draw_bld_sprite(g, *k, cx + bw - 20.0, cy + 24.0, 32.0, bcol);
+                tq.add(d.name, cx + 6.0, cy + 8.0, bw - 38.0, 22.0, Font::Normal, if afford { TEXT } else { DIM });
+                tq.add(format!("{:.0}", d.cost), cx + 6.0, cy + 32.0, bw - 38.0, 20.0, Font::Small, if afford { ACCENT } else { BAD });
                 if hover {
                     self.tip = Some(format!("{}\n{}\n価格 {:.0}　建設 {:.0} 秒\n自国の領土に置く", d.name, d.desc, d.cost, d.time));
                 }

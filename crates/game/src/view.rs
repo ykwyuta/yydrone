@@ -328,9 +328,27 @@ impl Game {
             }
             let col = SIDE_COL[c.owner as usize];
             let r = (0.35 + c.value as f32 * 0.09).max(5.0 * px);
-            g.circle(c.x, c.y, r * 1.3, 14, [0.0, 0.0, 0.0, 0.7]);
-            g.circle(c.x, c.y, r, 14, col);
-            g.circle(c.x, c.y, r * 0.45, 10, [1.0, 1.0, 1.0, 0.92]);
+            if z >= 3.0 {
+                let csz = (1.8 + c.value as f32 * 0.4).min(3.8);
+                // 都市の基盤に所属陣営カラーのリング
+                g.circle(c.x, c.y, r * 1.5, 16, [0.0, 0.0, 0.0, 0.75]);
+                g.circle(c.x, c.y, r * 1.2, 16, col);
+                g.circle(c.x, c.y, r * 0.55, 12, [0.12, 0.14, 0.18, 0.9]);
+                let tex = self.art.city_texture(g, c.value, c.port);
+                g.draw_textured(
+                    tex,
+                    c.x - csz * 0.5,
+                    c.y - csz * 0.68,
+                    c.x + csz * 0.5,
+                    c.y + csz * 0.32,
+                    [1.0, 1.0, 1.0, 1.0],
+                    true,
+                );
+            } else {
+                g.circle(c.x, c.y, r * 1.3, 14, [0.0, 0.0, 0.0, 0.7]);
+                g.circle(c.x, c.y, r, 14, col);
+                g.circle(c.x, c.y, r * 0.45, 10, [1.0, 1.0, 1.0, 0.92]);
+            }
         }
         // 建物
         for b in &w.blds {
@@ -343,6 +361,12 @@ impl Game {
             g.rect(b.x - s - px, b.y - s - px, b.x + s + px, b.y + s + px, [0.0, 0.0, 0.0, 0.85 * a]);
             g.rect(b.x - s, b.y - s, b.x + s, b.y + s, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, a]);
             g.rect_outline(b.x - s, b.y - s, b.x + s, b.y + s, s * 0.14, [c[0], c[1], c[2], a]);
+            if z >= 3.0 {
+                if let Some(tex) = self.art.bld_texture(g, b.kind) {
+                    let bsz = s * 2.8;
+                    g.draw_textured(tex, b.x - bsz * 0.5, b.y - bsz * 0.65, b.x + bsz * 0.5, b.y + bsz * 0.35, [1.0, 1.0, 1.0, a], true);
+                }
+            }
             let f = (b.hp / b.max_hp).clamp(0.0, 1.0);
             if f < 0.999 {
                 g.rect(b.x - s, b.y + s + 2.0 * px, b.x + s, b.y + s + 5.0 * px, DARK);
@@ -396,7 +420,20 @@ impl Game {
                 if u.dig > 0.3 && !sel && z > 6.0 {
                     g.ring(u.x, u.y, s * 0.95, s * 0.1, 10, [0.32, 0.23, 0.13, 0.85]);
                 }
-                draw_unit_icon(g, u.kind, u.x, u.y, u.face, s, c, t + u.id as f32);
+                let drawn_sprite = if z >= 3.5 {
+                    if let Some(tex) = self.art.unit_texture(g, u.kind) {
+                        let sz = s * 2.4;
+                        g.draw_textured(tex, u.x - sz * 0.5, u.y - sz * 0.5, u.x + sz * 0.5, u.y + sz * 0.5, [1.0, 1.0, 1.0, 1.0], true);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if !drawn_sprite {
+                    draw_unit_icon(g, u.kind, u.x, u.y, u.face, s, c, t + u.id as f32);
+                }
                 let f = u.hp / d.hp;
                 if (f < 0.995 || sel) && !d.suicide {
                     let bw = s * 0.9;

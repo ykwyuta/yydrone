@@ -1,6 +1,7 @@
 //! ドローン戦線 — 画面と操作（Windows 版とブラウザ版で共有）
 
 pub mod gfx;
+pub mod art;
 mod mobile;
 mod paint;
 pub mod ui;
@@ -134,6 +135,7 @@ pub struct Game {
     pub particles: Vec<Particle>,
     pub streaks: Vec<Streak>,
     pub fx_rng: Rng,
+    pub art: art::Art,
     pub clock: f32,
     pub quit: bool,
 }
@@ -198,6 +200,7 @@ impl Game {
             particles: Vec::new(),
             streaks: Vec::new(),
             fx_rng: Rng::new(seed ^ 77),
+            art: art::Art::default(),
             clock: 0.0,
             quit: false,
         }
