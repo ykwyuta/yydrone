@@ -31,6 +31,17 @@ const RAW_BLD_AIRFIELD: &[u8] = include_bytes!("../../../assets/map/airfield.rgb
 const RAW_BLD_WORKSHOP: &[u8] = include_bytes!("../../../assets/map/drone_workshop.rgba");
 const RAW_BLD_TRENCH: &[u8] = include_bytes!("../../../assets/map/trench_fort.rgba");
 
+const RAW_CITY_KYIV: &[u8] = include_bytes!("../../../assets/map/city_kyiv.rgba");
+const RAW_CITY_KHARKIV: &[u8] = include_bytes!("../../../assets/map/city_kharkiv.rgba");
+const RAW_CITY_ODESA: &[u8] = include_bytes!("../../../assets/map/city_odesa.rgba");
+const RAW_CITY_DNIPRO: &[u8] = include_bytes!("../../../assets/map/city_dnipro.rgba");
+const RAW_CITY_LVIV: &[u8] = include_bytes!("../../../assets/map/city_lviv.rgba");
+const RAW_CITY_ROSTOV: &[u8] = include_bytes!("../../../assets/map/city_rostov.rgba");
+const RAW_CITY_SEVASTOPOL: &[u8] = include_bytes!("../../../assets/map/city_sevastopol.rgba");
+const RAW_CITY_MARIUPOL: &[u8] = include_bytes!("../../../assets/map/city_mariupol.rgba");
+const RAW_CITY_DONETSK: &[u8] = include_bytes!("../../../assets/map/city_donetsk.rgba");
+const RAW_CITY_BAKHMUT: &[u8] = include_bytes!("../../../assets/map/city_bakhmut.rgba");
+
 const RAW_CITY_CAPITAL: &[u8] = include_bytes!("../../../assets/map/city_capital.rgba");
 const RAW_CITY_TOWN: &[u8] = include_bytes!("../../../assets/map/city_town.rgba");
 const RAW_CITY_PORT: &[u8] = include_bytes!("../../../assets/map/city_port.rgba");
@@ -68,6 +79,16 @@ pub struct Art {
     pub bld_workshop: Option<u32>,
     pub bld_trench: Option<u32>,
 
+    pub city_kyiv: Option<u32>,
+    pub city_kharkiv: Option<u32>,
+    pub city_odesa: Option<u32>,
+    pub city_dnipro: Option<u32>,
+    pub city_lviv: Option<u32>,
+    pub city_rostov: Option<u32>,
+    pub city_sevastopol: Option<u32>,
+    pub city_mariupol: Option<u32>,
+    pub city_donetsk: Option<u32>,
+    pub city_bakhmut: Option<u32>,
     pub city_capital: Option<u32>,
     pub city_town: Option<u32>,
     pub city_port: Option<u32>,
@@ -131,15 +152,31 @@ impl Art {
         }
     }
 
-    pub fn city_texture(&mut self, g: &mut dyn Gfx, value: u8, port: bool) -> u32 {
-        let (opt, raw) = if value >= 5 {
-            (&mut self.city_capital, RAW_CITY_CAPITAL)
-        } else if port {
-            (&mut self.city_port, RAW_CITY_PORT)
-        } else if value >= 4 {
-            (&mut self.city_industrial, RAW_CITY_INDUSTRIAL)
-        } else {
-            (&mut self.city_town, RAW_CITY_TOWN)
+    pub fn city_texture(&mut self, g: &mut dyn Gfx, name: &str, value: u8, port: bool) -> u32 {
+        let (opt, raw) = match name {
+            "キエヴァ" => (&mut self.city_kyiv, RAW_CITY_KYIV),
+            "ハルキア" => (&mut self.city_kharkiv, RAW_CITY_KHARKIV),
+            "オデスカ" => (&mut self.city_odesa, RAW_CITY_ODESA),
+            "ドニプロヴァ" | "ザポリア" => (&mut self.city_dnipro, RAW_CITY_DNIPRO),
+            "リヴィア" => (&mut self.city_lviv, RAW_CITY_LVIV),
+            "ロストヴァ" => (&mut self.city_rostov, RAW_CITY_ROSTOV),
+            "セヴァストラ" | "ノヴォロス" => (&mut self.city_sevastopol, RAW_CITY_SEVASTOPOL),
+            "マリウポラ" => (&mut self.city_mariupol, RAW_CITY_MARIUPOL),
+            "ドネスカ" | "ルガンスカ" => (&mut self.city_donetsk, RAW_CITY_DONETSK),
+            "バフムーラ" | "ポクロヴァ" | "イジューマ" | "クラマト" => {
+                (&mut self.city_bakhmut, RAW_CITY_BAKHMUT)
+            }
+            _ => {
+                if value >= 5 {
+                    (&mut self.city_capital, RAW_CITY_CAPITAL)
+                } else if port {
+                    (&mut self.city_port, RAW_CITY_PORT)
+                } else if value >= 4 {
+                    (&mut self.city_industrial, RAW_CITY_INDUSTRIAL)
+                } else {
+                    (&mut self.city_town, RAW_CITY_TOWN)
+                }
+            }
         };
         if let Some(id) = *opt {
             id

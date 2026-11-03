@@ -334,7 +334,7 @@ impl Game {
                 g.circle(c.x, c.y, r * 1.5, 16, [0.0, 0.0, 0.0, 0.75]);
                 g.circle(c.x, c.y, r * 1.2, 16, col);
                 g.circle(c.x, c.y, r * 0.55, 12, [0.12, 0.14, 0.18, 0.9]);
-                let tex = self.art.city_texture(g, c.value, c.port);
+                let tex = self.art.city_texture(g, c.name, c.value, c.port);
                 g.draw_textured(
                     tex,
                     c.x - csz * 0.5,
