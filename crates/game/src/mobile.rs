@@ -214,6 +214,8 @@ impl Game {
         let left = (w.duration - w.t).max(0.0) as u32;
         let date = w.date_text();
         let mud = w.mud();
+        let cond = w.conditions_text();
+        let cond_help = w.conditions_help();
         if let Some((f, fi, sh)) = info {
             tq.add(format!("資金 {f:.0} (+{fi:.0})"), 6.0, 3.0, 146.0, 24.0, Font::Normal, ACCENT);
             tq.add(format!("砲弾 {sh:.0}"), 6.0, 26.0, 146.0, 22.0, Font::Normal, if sh < 30.0 { BAD } else { TEXT });
@@ -229,7 +231,12 @@ impl Game {
         tq.shadow(format!("{:.1}%", s1 * 100.0), bx + bw - 56.0, 14.0, 54.0, 22.0, Font::Normal, TEXT);
         // 日付と残り時間
         let dx = bx + bw + 6.0;
-        tq.add(format!("{date}{}", if mud { " 泥" } else { "" }), dx, 3.0, 142.0, 24.0, Font::Normal, if mud { BAD } else { TEXT });
+        tq.add(format!("{date} {cond}"), dx, 3.0, 142.0, 24.0, Font::Normal, if mud { BAD } else { TEXT });
+        // タップすると地面と天候の効果を説明する
+        if inside(self.mouse, dx, 0.0, dx + 142.0, H) {
+            self.tip = Some(cond_help);
+            self.panel_top = H + 130.0;
+        }
         tq.add(format!("残り {}:{:02}:{:02}", left / 3600, left / 60 % 60, left % 60), dx, 26.0, 142.0, 22.0, Font::Normal, if left < 60 { BAD } else { ACCENT });
         // 右側：一時停止・速度・各画面（上端から離れた所でも押せるよう、ボタンを下まで伸ばす）
         let paused = self.paused;

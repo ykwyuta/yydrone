@@ -68,6 +68,25 @@ fn pixel(w: &World, px: usize, py: usize) -> u32 {
                 (v, v * 0.97, v * 0.92)
             }
         }
+        Terrain::Marsh => {
+            // 湿地：暗い緑に水たまりが光る
+            let n = value_noise(fx0 * 2.6, fy0 * 2.6, 23);
+            if n > 0.68 {
+                (52.0, 84.0, 88.0)
+            } else {
+                (70.0 + n * 18.0, 88.0 + n * 18.0, 62.0 + n * 10.0)
+            }
+        }
+        Terrain::Treeline => {
+            let n = value_noise(fx0 * 4.0, fy0 * 4.0, 29);
+            (52.0 + n * 20.0, 74.0 + n * 22.0, 44.0 + n * 14.0)
+        }
+        Terrain::Hill => {
+            // 高地：褐色に等高線のような濃淡
+            let h = fbm(fx0 * 0.45, fy0 * 0.45, 37, 3);
+            let band = if (h * 22.0).fract() < 0.16 { -14.0 } else { 0.0 };
+            (112.0 + h * 34.0 + band, 98.0 + h * 28.0 + band, 72.0 + h * 18.0 + band)
+        }
         Terrain::Plain => {
             // 畑のつぎはぎ：黒土地帯らしい黄緑〜茶。区画は斜めに少し傾ける
             let (qx, qy) = (fx0 * 0.94 + fy0 * 0.34, fy0 * 0.94 - fx0 * 0.34);
@@ -104,12 +123,41 @@ pub fn paint_all(w: &World) -> Vec<u32> {
                 let t = k as f32 / n as f32;
                 let (x, y) = (s[0].0 + dx * t, s[0].1 + dy * t);
                 let (px, py) = ((x * SCALE as f32) as usize, (y * SCALE as f32) as usize);
-                if px + 1 >= TW || py + 1 >= TH || !matches!(w.map.t(x as i32, y as i32), Terrain::Plain | Terrain::Forest | Terrain::Urban) {
+                if px + 1 >= TW || py + 1 >= TH || !(w.map.t(x as i32, y as i32).land() || w.map.t(x as i32, y as i32) == Terrain::Marsh) {
                     continue;
                 }
                 for (ox, oy, a) in [(0, 0, 0.8), (1, 0, 0.3), (0, 1, 0.3)] {
                     let p = &mut buf[(py + oy) * TW + px + ox];
                     *p = blend(*p, (182, 170, 134), a);
+                }
+            }
+        }
+    }
+    // 鉄道：黒い線に枕木
+    for line in &w.map.rail_lines {
+        let mut step = 0;
+        for s in line.windows(2) {
+            let (dx, dy) = (s[1].0 - s[0].0, s[1].1 - s[0].1);
+            let len = (dx * dx + dy * dy).sqrt().max(0.001);
+            let n = (len * SCALE as f32 * 2.0).ceil().max(1.0) as usize;
+            for k in 0..n {
+                let t = k as f32 / n as f32;
+                let (x, y) = (s[0].0 + dx * t, s[0].1 + dy * t);
+                let (px, py) = ((x * SCALE as f32) as usize, (y * SCALE as f32) as usize);
+                step += 1;
+                if px < 2 || py < 2 || px + 2 >= TW || py + 2 >= TH || !(w.map.t(x as i32, y as i32).land() || matches!(w.map.t(x as i32, y as i32), Terrain::Marsh | Terrain::Bridge)) {
+                    continue;
+                }
+                let p = &mut buf[py * TW + px];
+                *p = blend(*p, (28, 26, 30), 0.92);
+                // 枕木：線路に直角の短い線
+                if step % 7 == 0 {
+                    let (nx, ny) = (-dy / len, dx / len);
+                    for o in [-1.5f32, 1.5] {
+                        let (qx, qy) = ((px as f32 + nx * o) as usize, (py as f32 + ny * o) as usize);
+                        let q = &mut buf[qy * TW + qx];
+                        *q = blend(*q, (28, 26, 30), 0.8);
+                    }
                 }
             }
         }
@@ -223,6 +271,9 @@ pub fn paint_overlay(w: &World, viewer: Option<u8>, buf: &mut [u32]) {
     const TINT: [(f32, f32, f32); 2] = [(52.0, 122.0, 226.0), (222.0, 60.0, 52.0)];
     let winter = w.winter();
     let mud = w.mud();
+    let leaf = w.leaf_on();
+    let (_, month, _) = w.date();
+    let dry = (7..=8).contains(&month);
     for y in 0..H {
         for x in 0..W {
             let i = y * W + x;
@@ -249,16 +300,41 @@ pub fn paint_overlay(w: &World, viewer: Option<u8>, buf: &mut [u32]) {
                 r = r * 0.7 + 255.0 * 0.3;
                 g = g * 0.7 + 255.0 * 0.3;
                 b = b * 0.7 + 255.0 * 0.3;
-            } else if winter {
-                r = 225.0;
-                g = 232.0;
-                b = 240.0;
-                a = 58.0;
-            } else if mud && w.map.terrain[i] == Terrain::Plain {
-                r = r * 0.45 + 70.0 * 0.55;
-                g = g * 0.45 + 50.0 * 0.55;
-                b = b * 0.45 + 30.0 * 0.55;
-                a = 48.0;
+            } else {
+                // 季節の色：領土の色と混ぜて、どちらの土地か分かるようにする
+                let t = w.map.terrain[i];
+                let leafy = matches!(t, Terrain::Forest | Terrain::Treeline);
+                let tint = if mud {
+                    // 泥濘が雪より優先（2022年の開戦時は2月でも泥濘）
+                    if matches!(t, Terrain::Plain | Terrain::Treeline | Terrain::Marsh) {
+                        Some((64.0, 46.0, 28.0, 92.0))
+                    } else {
+                        None
+                    }
+                } else if winter {
+                    // 雪。森は枝が見えて暗い
+                    if leafy {
+                        Some((150.0, 150.0, 150.0, 70.0))
+                    } else if matches!(t, Terrain::Plain | Terrain::Hill | Terrain::Marsh | Terrain::Urban) {
+                        Some((232.0, 238.0, 244.0, 105.0))
+                    } else {
+                        None
+                    }
+                } else if leafy && !leaf {
+                    // 落葉した木々
+                    Some((110.0, 84.0, 58.0, 84.0))
+                } else if dry && t == Terrain::Plain {
+                    // 真夏のステップは乾いて黄色い
+                    Some((190.0, 164.0, 92.0, 56.0))
+                } else {
+                    None
+                };
+                if let Some((sr, sg, sb, sa)) = tint {
+                    r = r * 0.3 + sr * 0.7;
+                    g = g * 0.3 + sg * 0.7;
+                    b = b * 0.3 + sb * 0.7;
+                    a = sa;
+                }
             }
             // 占領が進んでいるタイルは敵の色に寄せる
             if !edge && w.cap[i] > 0 {

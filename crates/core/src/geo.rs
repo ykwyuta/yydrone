@@ -1,6 +1,6 @@
 //! 地図データ：海岸線・河川・国境・都市・道路（実在の地形を下敷きにした架空の戦域）
 
-use crate::rng::{fbm, value_noise};
+use crate::rng::{fbm, hash2, value_noise};
 
 pub const W: usize = 320;
 pub const H: usize = 200;
@@ -20,6 +20,35 @@ pub enum Terrain {
     Bridge,
     /// 中立国（通行できず、支配領域にも数えない）
     Neutral,
+    /// 湿地（ポレシア）。凍れば通れるが、ふだんは車両が道路から離れられない
+    Marsh,
+    /// 畑を仕切る樹林帯。葉のある間は歩兵を隠す
+    Treeline,
+    /// 高地・ボタ山。見晴らしがよく守りやすい
+    Hill,
+}
+
+impl Terrain {
+    /// 建物や塹壕を作れる地面か
+    #[inline]
+    pub fn land(self) -> bool {
+        matches!(self, Terrain::Plain | Terrain::Forest | Terrain::Urban | Terrain::Treeline | Terrain::Hill)
+    }
+    /// 市街以外の開けた地面か（竜の歯や水没の対象）
+    #[inline]
+    pub fn open(self) -> bool {
+        matches!(self, Terrain::Plain | Terrain::Forest | Terrain::Treeline | Terrain::Hill)
+    }
+}
+
+/// 地面の状態
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Ground {
+    Normal,
+    /// 泥濘期：道路の外はほとんど動けない
+    Mud,
+    /// 凍結：どこでも走れるが塹壕は掘りにくい
+    Frozen,
 }
 
 /// 通行の種類
@@ -62,6 +91,10 @@ pub struct Label {
 pub struct Map {
     pub terrain: Vec<Terrain>,
     pub road: Vec<bool>,
+    /// 線路（切られている間は false）
+    pub rail: Vec<bool>,
+    /// 描画用の線路の中心線
+    pub rail_lines: Vec<Vec<(f32, f32)>>,
     /// 描画用の道路の中心線
     pub road_lines: Vec<Vec<(f32, f32)>>,
     pub bridge_at: Vec<u16>,
@@ -69,6 +102,8 @@ pub struct Map {
     pub cities: Vec<City>,
     pub start_owner: Vec<i8>,
     pub labels: Vec<Label>,
+    /// いまの地面の状態（通行コストに効く）
+    pub ground: Ground,
     /// 地図を作ったときの橋の数（これより後ろは浮橋）
     base_bridges: usize,
 }
@@ -184,6 +219,20 @@ const ROADS: &[(&str, &str)] = &[
     ("ロストヴァ", "クラスノーダ"), ("ロストヴァ", "サリスカ"), ("サリスカ", "ヴォルガラ"), ("サリスカ", "スタヴロ"), ("クラスノーダ", "スタヴロ"), ("クラスノーダ", "ノヴォロス"),
 ];
 
+/// 主要な鉄道（都市名の組）。両国は同じ軌間で、線路はそのまま国境を越えてつながっている
+const RAILS: &[(&str, &str)] = &[
+    ("リヴィア", "テルノパ"), ("テルノパ", "ヴィニツァ"), ("ヴィニツァ", "キエヴァ"), ("ヴィニツァ", "オデスカ"), ("オデスカ", "ミコラ"), ("ミコラ", "ヘルソナ"), ("ミコラ", "クリヴォイ"),
+    ("クリヴォイ", "ドニプロヴァ"), ("キエヴァ", "ポルタ"), ("ポルタ", "ハルキア"), ("キエヴァ", "チェルニガ"), ("クレメンチャ", "ポルタ"), ("クレメンチャ", "クリヴォイ"),
+    ("ドニプロヴァ", "ザポリア"), ("ザポリア", "メリトーポ"), ("メリトーポ", "シンフェラ"), ("ヘルソナ", "シンフェラ"), ("シンフェラ", "セヴァストラ"), ("シンフェラ", "ケルチャ"),
+    ("ハルキア", "イジューマ"), ("イジューマ", "クラマト"), ("クラマト", "ポクロヴァ"), ("ポクロヴァ", "ドニプロヴァ"), ("クラマト", "ドネスカ"), ("ドネスカ", "マリウポラ"), ("ドネスカ", "ルガンスカ"),
+    ("ドネスカ", "タガンラ"), ("タガンラ", "ロストヴァ"), ("ルガンスカ", "ミレロヴァ"), ("ミレロヴァ", "ヴォロニア"), ("ミレロヴァ", "ロストヴァ"), ("ヴォロニア", "クルスカ"), ("クルスカ", "ベルゴラ"),
+    ("ベルゴラ", "ハルキア"), ("クルスカ", "ブリャンスカ"), ("ブリャンスカ", "チェルニガ"), ("クルスカ", "スーミャ"), ("スーミャ", "ポルタ"), ("ヴォロニア", "タンボヴァ"), ("ロストヴァ", "クラスノーダ"),
+    ("クラスノーダ", "ノヴォロス"), ("クラスノーダ", "スタヴロ"), ("ロストヴァ", "サリスカ"), ("サリスカ", "ヴォルガラ"), ("ミレロヴァ", "ヴォルガラ"),
+];
+
+/// ドンバの主なボタ山の場所（経度・緯度）
+const SPOIL_HEAPS: &[(f32, f32)] = &[(37.68, 48.13), (38.02, 48.31), (37.2, 48.27), (37.87, 48.59), (38.05, 48.72), (37.85, 48.05), (39.1, 48.4)];
+
 /// 川：(点列, 太さ)
 const RIVERS: &[(&[(f32, f32)], f32)] = &[
     // ドニプル川
@@ -261,6 +310,28 @@ impl Map {
                 let f = fbm(fx * 0.11, fy * 0.11, 77, 4) + value_noise(fx * 0.4, fy * 0.4, 3) * 0.1;
                 if f + north + carp + cau + crim > 0.72 {
                     *t = Terrain::Forest;
+                    continue;
+                }
+                // ポレシアの湿地
+                let wet = fbm(fx * 0.16, fy * 0.16, 131, 3);
+                if lat > 50.9 && lat < 52.2 && lon > 23.8 && lon < 32.6 && wet > 0.53 {
+                    *t = Terrain::Marsh;
+                    continue;
+                }
+                // 山地と丘陵（カルパチア・クリメア南部・カフカス）とドンバの尾根
+                let hilly = fbm(fx * 0.2, fy * 0.2, 151, 3);
+                let ridge = lat > 47.75 && lat < 48.75 && lon > 37.2 && lon < 40.2;
+                if ((carp + cau + crim) > 0.0 && hilly > 0.38) || (ridge && hilly > 0.56) {
+                    *t = Terrain::Hill;
+                    continue;
+                }
+                // 南部のステップは、畑の間を細い樹林帯が仕切っている
+                if lat < 50.8 {
+                    let (nx, ny) = (fx + (value_noise(fx * 0.07, fy * 0.07, 171) - 0.5) * 8.0, fy + (value_noise(fx * 0.07, fy * 0.07, 173) - 0.5) * 8.0);
+                    let on_line = nx.rem_euclid(11.0) < 1.0 || ny.rem_euclid(8.0) < 1.0;
+                    if on_line && hash2((nx / 11.0).floor() as i32, (ny / 8.0).floor() as i32, 177) < 0.55 {
+                        *t = Terrain::Treeline;
+                    }
                 }
             }
         }
@@ -274,13 +345,18 @@ impl Map {
         // 都市の市街地
         for c in &cities {
             let r = 1.0 + c.value as f32 * 0.8;
-            stamp(&mut terrain, c.x, c.y, r, Terrain::Urban, Some(&[Terrain::Plain, Terrain::Forest]));
+            stamp(&mut terrain, c.x, c.y, r, Terrain::Urban, Some(&[Terrain::Plain, Terrain::Forest, Terrain::Treeline, Terrain::Marsh, Terrain::Hill]));
+        }
+        // ボタ山（炭鉱の残土の山。周りを見渡せる）
+        for (lon, lat) in SPOIL_HEAPS {
+            let (x, y) = ll(*lon, *lat);
+            stamp(&mut terrain, x, y, 1.3, Terrain::Hill, Some(&[Terrain::Plain, Terrain::Forest, Terrain::Treeline]));
         }
         // 川
         for (i, (pts, w)) in RIVERS.iter().enumerate() {
             let tp: Vec<_> = pts.iter().map(|p| ll(p.0, p.1)).collect();
             for p in jitter(&tp, 100 + i as u32, 8.0) {
-                stamp(&mut terrain, p.0, p.1, *w, Terrain::River, Some(&[Terrain::Plain, Terrain::Forest, Terrain::Urban]));
+                stamp(&mut terrain, p.0, p.1, *w, Terrain::River, Some(&[Terrain::Plain, Terrain::Forest, Terrain::Urban, Terrain::Marsh, Terrain::Treeline, Terrain::Hill]));
             }
         }
         // 道路と橋
@@ -301,12 +377,51 @@ impl Map {
                     let ti = tidx(px, py);
                     match terrain[ti] {
                         Terrain::River => pending_bridge[ti] = true,
-                        Terrain::Plain | Terrain::Forest | Terrain::Urban => road[ti] = true,
+                        t if t.land() || t == Terrain::Marsh => road[ti] = true,
                         _ => {}
                     }
                 }
             }
             road_lines.push(line);
+        }
+        // 鉄道（川を渡るところは鉄橋になる）
+        let mut rail = vec![false; n];
+        let mut rail_lines = Vec::new();
+        for (i, (a, b)) in RAILS.iter().enumerate() {
+            let (Some(pa), Some(pb)) = (named(a), named(b)) else { continue };
+            rail_lines.push(jitter(&[pa, pb], 500 + i as u32, 3.0));
+        }
+        // ケルチャからクリメア橋を渡ってクラスノーダへ
+        if let (Some(pa), Some(pb)) = (named("ケルチャ"), named("クラスノーダ")) {
+            rail_lines.push(jitter(&[pa, ll(36.45, 45.38), ll(36.85, 45.25), ll(37.3, 45.25), pb], 590, 0.0));
+        }
+        for line in &rail_lines {
+            let mut prev: Option<(i32, i32)> = None;
+            for p in line {
+                let (x, y) = (p.0 as i32, p.1 as i32);
+                // 上下左右でつながるように、斜めに進むときは角も埋める
+                let mut cells = vec![(x, y)];
+                if let Some((px, py)) = prev {
+                    if px != x && py != y {
+                        cells.push((x, py));
+                    }
+                }
+                for (cx, cy) in cells {
+                    if !in_map(cx, cy) {
+                        continue;
+                    }
+                    let ti = tidx(cx, cy);
+                    match terrain[ti] {
+                        Terrain::River => {
+                            pending_bridge[ti] = true;
+                            rail[ti] = true;
+                        }
+                        t if t.land() || t == Terrain::Marsh => rail[ti] = true,
+                        _ => {}
+                    }
+                }
+                prev = Some((x, y));
+            }
         }
         // クリメア橋（ケルチャ海峡）
         let (kx0, ky0) = ll(36.45, 45.38);
@@ -356,6 +471,7 @@ impl Map {
                 bridge_at[t] = id;
                 // 海峡の橋は両岸をつなぐ陸として扱う
                 start_owner[t] = 1;
+                rail[t] = true;
             }
             bridges.push(make_bridge(kerch.iter().map(|t| *t as u32).collect(), Terrain::Sea, 1200.0, Some("クリメア橋")));
         }
@@ -386,7 +502,7 @@ impl Map {
             labels.push(Label { text, x, y, kind });
         }
         let base_bridges = bridges.len();
-        Map { terrain, road, road_lines, bridge_at, bridges, cities, start_owner, labels, base_bridges }
+        Map { terrain, road, rail, rail_lines, road_lines, bridge_at, bridges, cities, start_owner, labels, ground: Ground::Normal, base_bridges }
     }
 
     pub fn base_bridge_count(m: &Map) -> usize {
@@ -415,20 +531,51 @@ impl Map {
                     None
                 }
             }
-            Pass::Inf => match t {
-                Terrain::Sea | Terrain::Neutral => None,
-                Terrain::River => Some(5.0),
-                Terrain::Forest => Some(1.3),
-                Terrain::Bridge => Some(0.7),
-                _ => Some(if self.road[i] { 0.8 } else { 1.0 }),
-            },
-            Pass::Veh => match t {
-                Terrain::Sea | Terrain::Neutral | Terrain::River => None,
-                Terrain::Forest => Some(if self.road[i] { 0.6 } else { 1.9 }),
-                Terrain::Bridge => Some(0.6),
-                Terrain::Urban => Some(if self.road[i] { 0.7 } else { 1.3 }),
-                _ => Some(if self.road[i] { 0.6 } else { 1.0 }),
-            },
+            Pass::Inf => {
+                if self.rail[i] && t != Terrain::River {
+                    return Some(0.7);
+                }
+                if self.road[i] && t != Terrain::River {
+                    return Some(if t == Terrain::Bridge { 0.7 } else { 0.8 });
+                }
+                let mud = if self.ground == Ground::Mud { 1.25 } else { 1.0 };
+                match t {
+                    Terrain::Sea | Terrain::Neutral => None,
+                    Terrain::River => Some(5.0),
+                    Terrain::Forest => Some(1.3 * mud),
+                    Terrain::Hill => Some(1.3 * mud),
+                    Terrain::Marsh => Some(if self.ground == Ground::Frozen { 1.1 } else { 2.5 * mud }),
+                    _ => Some(mud),
+                }
+            }
+            Pass::Veh => {
+                if matches!(t, Terrain::Sea | Terrain::Neutral | Terrain::River) {
+                    return None;
+                }
+                // 線路は泥濘でも使える
+                if self.rail[i] {
+                    return Some(0.45);
+                }
+                if self.road[i] {
+                    return Some(if t == Terrain::Urban { 0.7 } else { 0.6 });
+                }
+                // 泥濘期は道路の外を避け、凍れば湿地も走れる
+                let (g, frozen) = match self.ground {
+                    Ground::Mud => (2.6, false),
+                    Ground::Frozen => (0.9, true),
+                    Ground::Normal => (1.0, false),
+                };
+                Some(match t {
+                    Terrain::Bridge => 0.6,
+                    Terrain::Urban => 1.3,
+                    Terrain::Forest => 1.9 * g,
+                    Terrain::Hill => 1.5 * g,
+                    Terrain::Treeline => 1.2 * g,
+                    Terrain::Marsh if frozen => 1.2,
+                    Terrain::Marsh => 5.0 * g,
+                    _ => g,
+                })
+            }
         }
     }
 }

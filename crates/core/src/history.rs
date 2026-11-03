@@ -116,6 +116,12 @@ pub enum Eff {
     AirfieldRaid(u8, f32, f32),
     /// ドニプル川下流の氾濫（日数）
     Flood(u32),
+    /// この日数の間、季節にかかわらず地面を泥濘にする
+    EarlyMud(u32),
+    /// 天候をこの秒数だけ霧にする
+    FogBank(f32),
+    /// 円の中の線路を切る（半径、復旧までの秒数）
+    RailCut(Place, f32, f32),
 }
 
 pub struct HistEvent {
@@ -170,6 +176,15 @@ pub const HISTORY: &[HistEvent] = &[
     ),
     ev(
         (2022, 2, 24),
+        "暖冬で泥濘が早い",
+        "例年より暖かく、地面が十分に凍らないまま開戦を迎えた。車列は道路に縛られる。",
+        0,
+        None,
+        None,
+        &[Eff::EarlyMud(66)],
+    ),
+    ev(
+        (2022, 2, 24),
         "ホストメラ空港への強襲",
         "ヘリで降下した空挺部隊がキエヴァ近郊の空港を襲撃した。ウクラヴィア軍は同日のうちに反撃に出た。",
         1,
@@ -198,6 +213,15 @@ pub const HISTORY: &[HistEvent] = &[
         ],
     ),
     ev(
+        (2022, 2, 25),
+        "イルピア川の氾濫",
+        "キエヴァ北西のダムが破られ、川と湿地が広く水に沈んだ。ロスコヴィア軍は渡河できず、首都への道を阻まれる。",
+        0,
+        Some(Place::LL(30.3, 50.75)),
+        None,
+        &[Eff::Mod(1, ModKind::Slow(0.35), Some((Place::LL(30.25, 50.7), 15.0)), 36)],
+    ),
+    ev(
         (2022, 2, 26),
         "スターリンカの提供開始",
         "宇宙企業スペースエクサのエロン・マスカ氏がウクラヴィアでのサービス開始を表明し、まもなく端末が到着した。前線の通信とドローンを支える基盤になっていく。",
@@ -206,6 +230,20 @@ pub const HISTORY: &[HistEvent] = &[
         None,
         &[Eff::Mod(0, ModKind::Uplink, None, 3000)],
     ),
+    HistEvent {
+        date: (2022, 2, 27),
+        month_only: true,
+        title: "国境の鉄道を破壊",
+        text: "ウクラヴィアは両国をつなぐ線路を自ら断った。ロスコヴィア軍の補給は鉄道に大きく頼っている。",
+        side: 0,
+        place: Some(Place::City("ハルキア")),
+        requires: None,
+        effects: &[
+            Eff::RailCut(Place::LL(36.45, 50.35), 8.0, 240.0),
+            Eff::RailCut(Place::LL(32.6, 52.05), 8.0, 240.0),
+            Eff::RailCut(Place::LL(34.8, 51.2), 8.0, 240.0),
+        ],
+    },
     ev(
         (2022, 2, 28),
         "キエヴァ北方に長大な車列",
@@ -276,6 +314,15 @@ pub const HISTORY: &[HistEvent] = &[
         Some(Place::City("オデスカ")),
         None,
         &[Eff::Funds(0, 200.0)],
+    ),
+    ev(
+        (2022, 7, 6),
+        "メリトーポ近くの橋を爆破",
+        "占領地の鉄道の要衝メリトーポの近くで橋が破壊された。陸の回廊を走る補給が細る。",
+        0,
+        Some(Place::City("メリトーポ")),
+        None,
+        &[Eff::RailCut(Place::City("メリトーポ"), 7.0, 120.0)],
     ),
     ev(
         (2022, 9, 6),
@@ -477,6 +524,30 @@ pub const HISTORY: &[HistEvent] = &[
         &[],
     ),
     HistEvent {
+        date: (2025, 10, 9),
+        month_only: true,
+        title: "鉄道への攻撃が激化",
+        text: "ロスコヴィアがウクラヴィアの線路と列車への攻撃を強めた。2か月で220回を超えたと報じられている。「第二の軍」と呼ばれる鉄道が狙われる。",
+        side: 1,
+        place: Some(Place::City("ドニプロヴァ")),
+        requires: None,
+        effects: &[
+            Eff::RailCut(Place::City("ドニプロヴァ"), 6.0, 150.0),
+            Eff::RailCut(Place::City("ポルタ"), 6.0, 150.0),
+            Eff::RailCut(Place::City("クラマト"), 6.0, 150.0),
+        ],
+    },
+    HistEvent {
+        date: (2025, 11, 15),
+        month_only: true,
+        title: "霧の中のポクロヴァ",
+        text: "濃い霧でドローンが飛べない間に、ロスコヴィアの小部隊が防衛線の隙間へ浸透した。",
+        side: 1,
+        place: Some(Place::City("ポクロヴァ")),
+        requires: None,
+        effects: &[Eff::FogBank(90.0), Eff::Spawn(1, UK::Infantry, 6, Place::City("ドネスカ")), Eff::Axes(1, &["ポクロヴァ", "クラマト"], 90)],
+    },
+    HistEvent {
         date: (2025, 12, 10),
         month_only: true,
         title: "ロスコヴィア軍もスターリンカでドローンを誘導",
@@ -510,6 +581,16 @@ pub const HISTORY: &[HistEvent] = &[
             Eff::Mod(0, ModKind::Outage, None, 6),
         ],
     ),
+    HistEvent {
+        date: (2026, 6, 19),
+        month_only: true,
+        title: "クリメアへの鉄道橋を攻撃",
+        text: "半島へ通じる鉄道橋が相次いで攻撃された。残る線路はメリトーポ経由とケルチャ経由の二本で、半島への補給が細る。",
+        side: 0,
+        place: Some(Place::City("シンフェラ")),
+        requires: None,
+        effects: &[Eff::RailCut(Place::LL(34.4, 46.15), 8.0, 150.0), Eff::Mod(1, ModKind::NoSupply, Some((Place::City("シンフェラ"), 30.0)), 40)],
+    },
     ev(
         (2026, 7, 25),
         "ホワイトリストの穴",
@@ -654,6 +735,18 @@ impl World {
                 }
             }
             Eff::Flood(days) => self.start_flood(today + days),
+            Eff::EarlyMud(days) => {
+                self.mud_until = today + days;
+                self.update_season();
+            }
+            Eff::RailCut(at, r, secs) => {
+                let p = self.place_pos(at);
+                self.cut_rail(p.0, p.1, r, secs);
+            }
+            Eff::FogBank(secs) => {
+                self.weather = Weather::Fog;
+                self.weather_t = secs;
+            }
         }
     }
 
@@ -693,7 +786,7 @@ impl World {
                 for dx in -2..=2 {
                     if in_map(x + dx, y + dy) {
                         let i = tidx(x + dx, y + dy);
-                        if matches!(self.map.terrain[i], Terrain::Plain | Terrain::Forest) {
+                        if self.map.terrain[i].open() && !self.map.rail[i] {
                             tiles.push((i as u32, self.map.terrain[i]));
                             self.map.terrain[i] = Terrain::River;
                         }
@@ -725,5 +818,8 @@ impl World {
 impl World {
     pub(crate) fn run_history_for_test(&mut self) {
         self.run_history();
+    }
+    pub(crate) fn repair_rails_for_test(&mut self) {
+        self.repair_rails();
     }
 }

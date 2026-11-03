@@ -7,7 +7,7 @@ use super::*;
 use crate::ai::Plan;
 
 const MAGIC: &[u8; 4] = b"YYDR";
-pub const SAVE_VERSION: u32 = 1;
+pub const SAVE_VERSION: u32 = 3;
 
 struct Writer(Vec<u8>);
 
@@ -247,6 +247,9 @@ fn terrain_from(c: u8) -> R<Terrain> {
         4 => Terrain::Urban,
         5 => Terrain::Bridge,
         6 => Terrain::Neutral,
+        7 => Terrain::Marsh,
+        8 => Terrain::Treeline,
+        9 => Terrain::Hill,
         _ => return Err(BAD.into()),
     })
 }
@@ -286,6 +289,7 @@ impl World {
         w.rle(&self.mines);
         w.rle(&self.map.terrain.iter().map(|t| terrain_code(*t)).collect::<Vec<_>>());
         w.rle(&self.map.road.iter().map(|r| *r as u8).collect::<Vec<_>>());
+        w.rle(&self.map.rail.iter().map(|r| *r as u8).collect::<Vec<_>>());
         w.rle(&self.cap.iter().map(|c| (*c).clamp(0, 255) as u8).collect::<Vec<_>>());
         // 橋（最初からある橋は耐久だけ、浮橋は場所も）
         w.u32(self.map.bridges.len() as u32);
@@ -410,6 +414,14 @@ impl World {
             w.u8(terrain_code(f.1));
         }
         w.u32(self.flood_until);
+        w.u32(self.mud_until);
+        w.u32(self.rail_cuts.len() as u32);
+        for c in &self.rail_cuts {
+            w.u32(c.0);
+            w.f32(c.1);
+        }
+        w.u8(self.weather as u8);
+        w.f32(self.weather_t);
         // 記録
         w.u32(self.history.len() as u32);
         for h in &self.history {
@@ -478,6 +490,10 @@ impl World {
         }
         r.rle(&mut buf)?;
         for (t, b) in w.map.road.iter_mut().zip(&buf) {
+            *t = *b != 0;
+        }
+        r.rle(&mut buf)?;
+        for (t, b) in w.map.rail.iter_mut().zip(&buf) {
             *t = *b != 0;
         }
         r.rle(&mut buf)?;
@@ -673,6 +689,23 @@ impl World {
             w.flooded.push((t, terrain_from(r.u8()?)?));
         }
         w.flood_until = r.u32()?;
+        w.mud_until = r.u32()?;
+        w.rail_cuts.clear();
+        for _ in 0..r.usize()? {
+            let t = r.u32()?;
+            if t as usize >= n {
+                return Err(BAD.into());
+            }
+            w.rail_cuts.push((t, r.f32()?));
+        }
+        w.weather = match r.u8()? {
+            0 => Weather::Clear,
+            1 => Weather::Rain,
+            2 => Weather::Fog,
+            3 => Weather::Snow,
+            _ => return Err(BAD.into()),
+        };
+        w.weather_t = r.f32()?;
         w.history.clear();
         for _ in 0..r.usize()? {
             w.history.push(r.pair()?);
@@ -687,7 +720,9 @@ impl World {
         }
         w.total_tiles = w.owner.iter().filter(|o| **o >= 0).count() as u32;
         w.count_tiles();
+        w.notices.clear();
         w.update_season();
+        w.notices.clear();
         w.economy(0.0);
         w.update_supply();
         w.update_vision();

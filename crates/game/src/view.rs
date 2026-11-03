@@ -239,6 +239,42 @@ impl Game {
         self.streaks.retain(|s| s.life > 0.0);
     }
 
+    /// 天候を画面に重ねる
+    pub fn draw_weather(&mut self, g: &mut dyn Gfx) {
+        let Some(w) = self.world.as_ref() else { return };
+        let (sw, sh) = g.size();
+        let t = self.anim;
+        let hash = |i: u32, s: u32| yydrone_core::rng::hash2(i as i32, s as i32, 991);
+        match w.weather {
+            Weather::Clear => {}
+            Weather::Fog => {
+                g.rect(0.0, 0.0, sw, sh, [0.78, 0.8, 0.82, 0.3]);
+                for i in 0..14u32 {
+                    let (x0, y0, r) = (hash(i, 1) * sw, hash(i, 2) * sh, 120.0 + hash(i, 3) * 200.0);
+                    let x = (x0 + t * (6.0 + hash(i, 4) * 10.0)) % (sw + 400.0) - 200.0;
+                    g.circle(x, y0, r, 18, [0.85, 0.87, 0.89, 0.09]);
+                }
+            }
+            Weather::Rain => {
+                g.rect(0.0, 0.0, sw, sh, [0.2, 0.25, 0.32, 0.14]);
+                for i in 0..160u32 {
+                    let x = (hash(i, 1) * sw + t * 90.0) % sw;
+                    let y = (hash(i, 2) * sh + t * (620.0 + hash(i, 3) * 200.0)) % sh;
+                    g.line((x, y), (x - 3.0, y + 14.0), 1.0, [0.75, 0.84, 0.95, 0.35]);
+                }
+            }
+            Weather::Snow => {
+                g.rect(0.0, 0.0, sw, sh, [0.85, 0.88, 0.92, 0.1]);
+                for i in 0..180u32 {
+                    let sway = (t * 0.9 + hash(i, 4) * 6.0).sin() * 14.0;
+                    let x = (hash(i, 1) * sw + sway + sw) % sw;
+                    let y = (hash(i, 2) * sh + t * (34.0 + hash(i, 3) * 40.0)) % sh;
+                    g.circle(x, y, 1.2 + hash(i, 5) * 1.4, 5, [1.0, 1.0, 1.0, 0.75]);
+                }
+            }
+        }
+    }
+
     pub fn draw_world(&mut self, g: &mut dyn Gfx) {
         let (sw, sh) = g.size();
         let z = self.zoom;
@@ -274,6 +310,15 @@ impl Game {
                 let f = b.hp / b.max_hp;
                 g.rect(b.x - 1.0, b.y - 1.4, b.x + 1.0, b.y - 1.1, DARK);
                 g.rect(b.x - 1.0, b.y - 1.4, b.x - 1.0 + 2.0 * f, b.y - 1.1, [1.0, 0.75, 0.25, 1.0]);
+            }
+        }
+        // 切られた線路
+        for &(t, _) in w.rail_cuts.iter().step_by(3) {
+            let (cx, cy) = ((t as usize % W) as f32 + 0.5, (t as usize / W) as f32 + 0.5);
+            if in_view(cx, cy) && viewer.is_none_or(|v| w.vis[v as usize][t as usize] != 0) {
+                let s = (0.45f32).max(4.0 * px);
+                g.line((cx - s, cy - s), (cx + s, cy + s), 2.0 * px, [1.0, 0.35, 0.2, 0.95]);
+                g.line((cx - s, cy + s), (cx + s, cy - s), 2.0 * px, [1.0, 0.35, 0.2, 0.95]);
             }
         }
         // 都市

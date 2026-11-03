@@ -13,6 +13,9 @@ pub use save::SAVE_VERSION;
 /// 部隊 1 つあたりの維持費（資金／秒）
 const UPKEEP: f32 = 0.3;
 
+/// 切られた線路が復旧するまでの秒数
+const RAIL_REPAIR: f32 = 45.0;
+
 /// 1試合の長さ（秒）。2時間で固定
 pub const WAR_SECONDS: f32 = 7200.0;
 
@@ -25,6 +28,39 @@ const LETHALITY: f32 = 0.55;
 pub const VIS_GROUND: u8 = 1;
 pub const VIS_AIR: u8 = 2;
 pub const VIS_CLOSE: u8 = 4;
+/// ドローンのすぐ下（葉の陰の部隊も見つかる）
+pub const VIS_AIR_NEAR: u8 = 8;
+
+/// 天候
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Weather {
+    Clear,
+    Rain,
+    Fog,
+    Snow,
+}
+
+/// 天候の効果
+#[derive(Clone, Copy, Debug)]
+pub struct WeatherFx {
+    /// 地上の視界の倍率
+    pub ground_vis: f32,
+    /// ドローン・航空機の視界の倍率
+    pub air_vis: f32,
+    /// FPV・爆撃ドローンの発射間隔の倍率
+    pub drone_reload: f32,
+    /// FPV が 0.5 秒ごとに墜落する確率
+    pub drone_crash: f32,
+}
+
+pub fn weather_fx(w: Weather) -> WeatherFx {
+    match w {
+        Weather::Clear => WeatherFx { ground_vis: 1.0, air_vis: 1.0, drone_reload: 1.0, drone_crash: 0.0 },
+        Weather::Rain => WeatherFx { ground_vis: 0.85, air_vis: 0.6, drone_reload: 1.8, drone_crash: 0.05 },
+        Weather::Fog => WeatherFx { ground_vis: 0.45, air_vis: 0.35, drone_reload: 3.0, drone_crash: 0.1 },
+        Weather::Snow => WeatherFx { ground_vis: 0.7, air_vis: 0.6, drone_reload: 1.6, drone_crash: 0.05 },
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Target {
@@ -266,8 +302,15 @@ pub struct World {
     pub(crate) flood_until: u32,
     /// 地形の絵を丸ごと描き直すタイル
     pub repaint: Vec<u32>,
-    /// 泥濘期か（毎秒更新）
-    mud_now: bool,
+    /// 地面の状態の切りかわりの知らせ用
+    last_ground: Ground,
+    /// 史実の出来事で泥濘が早まっている期限の日
+    pub(crate) mud_until: u32,
+    /// 切られた線路（タイル, 復旧する時刻）
+    pub rail_cuts: Vec<(u32, f32)>,
+    pub weather: Weather,
+    /// いまの天候が続く残り秒
+    pub(crate) weather_t: f32,
     /// 都市のもともとの持ち主
     city_home: Vec<u8>,
 }
@@ -343,7 +386,11 @@ impl World {
             flooded: Vec::new(),
             flood_until: 0,
             repaint: Vec::new(),
-            mud_now: false,
+            last_ground: Ground::Normal,
+            mud_until: 0,
+            rail_cuts: Vec::new(),
+            weather: Weather::Clear,
+            weather_t: 0.0,
             city_home: Vec::new(),
         };
         w.city_home = w.map.cities.iter().map(|c| c.owner).collect();
@@ -373,7 +420,7 @@ impl World {
 
     /// 3/15〜4/30 と 10/10〜11/20 は泥濘期
     pub fn mud(&self) -> bool {
-        self.mud_now
+        self.map.ground == Ground::Mud
     }
 
     pub fn winter(&self) -> bool {
@@ -381,14 +428,124 @@ impl World {
         m == 12 || m <= 2
     }
 
+    /// 木々に葉がある時期（4月〜10月）
+    pub fn leaf_on(&self) -> bool {
+        let (_, m, _) = self.date();
+        (4..=10).contains(&m)
+    }
+
     pub fn date_text(&self) -> String {
         let (y, m, d) = self.date();
         format!("{y}年{m}月{d}日")
     }
 
-    fn update_season(&mut self) {
+    /// 上部バーに出す短い状況（地面・天候）
+    pub fn conditions_text(&self) -> String {
+        let g = match self.map.ground {
+            Ground::Mud => "泥濘",
+            Ground::Frozen => "凍結",
+            Ground::Normal => {
+                if self.leaf_on() {
+                    "新緑"
+                } else {
+                    "落葉"
+                }
+            }
+        };
+        let w = match self.weather {
+            Weather::Clear => "晴",
+            Weather::Rain => "雨",
+            Weather::Fog => "霧",
+            Weather::Snow => "雪",
+        };
+        format!("{g}・{w}")
+    }
+
+    /// いまの地面と天候の効果の説明
+    pub fn conditions_help(&self) -> String {
+        let g = match self.map.ground {
+            Ground::Mud => "泥濘期：車両は道路の外でほとんど動けず、装輪車両は特に遅い。部隊は道路に集まるので狙われやすい",
+            Ground::Frozen => "凍結：地面が固く車両はどこでも走れ、湿地も渡れる。一方で塹壕はなかなか掘れない",
+            Ground::Normal => "地面は乾いていて、車両は道路の外も走れる",
+        };
+        let l = if self.leaf_on() { "葉が茂り、樹林帯や森の歩兵はドローンからも見つけにくい" } else { "葉が落ちて樹林帯は丸見え。森でも上空からは隠れられない" };
+        let w = match self.weather {
+            Weather::Clear => "晴れ：ドローンがよく飛び、よく見える",
+            Weather::Rain => "雨：ドローンの視界が落ち、FPV の発射が遅くなる",
+            Weather::Fog => "霧：視界が大きく落ち、ドローンはほとんど飛べない。歩兵の浸透と戦車の好機",
+            Weather::Snow => "雪：視界が落ち、ドローンの運用が難しくなる",
+        };
+        format!("{g}\n{l}\n{w}")
+    }
+
+    pub(crate) fn ground_of_date(m: u32, d: u32) -> Ground {
+        if (m == 3 && d >= 15) || m == 4 || (m == 10 && d >= 10) || (m == 11 && d <= 20) {
+            Ground::Mud
+        } else if (m == 12 && d >= 15) || m <= 2 || (m == 3 && d < 15) {
+            Ground::Frozen
+        } else {
+            Ground::Normal
+        }
+    }
+
+    pub(crate) fn update_season(&mut self) {
         let (_, m, d) = self.date();
-        self.mud_now = (m == 3 && d >= 15) || m == 4 || (m == 10 && d >= 10) || (m == 11 && d <= 20);
+        let mut g = Self::ground_of_date(m, d);
+        if self.day() < self.mud_until {
+            g = Ground::Mud;
+        }
+        self.map.ground = g;
+        if g != self.last_ground {
+            self.last_ground = g;
+            self.recent.clear();
+            if self.t > 0.0 {
+                let text = match g {
+                    Ground::Mud => "泥濘期に入った。車両は道路の外でほとんど動けない",
+                    Ground::Frozen => "地面が凍った。車両はどこでも走れるが、塹壕は掘りにくい",
+                    Ground::Normal => "地面が乾いた。車両が道路の外も走れるようになった",
+                };
+                self.notices.push(Notice { text: text.to_string(), side: None, x: -1.0, y: -1.0, tone: 0 });
+            }
+        }
+    }
+
+    /// 月ごとの天候の出やすさで次の天候を決める
+    pub(crate) fn update_weather(&mut self, dt: f32) {
+        self.weather_t -= dt;
+        if self.weather_t > 0.0 {
+            return;
+        }
+        let (_, m, _) = self.date();
+        // [雨, 霧, 雪]（残りが晴れ）
+        let (rain, fog, snow) = match m {
+            12 | 1 | 2 => (0.05, 0.25, 0.35),
+            3 => (0.25, 0.2, 0.2),
+            4 => (0.35, 0.1, 0.0),
+            5..=9 => (0.18, 0.02, 0.0),
+            10 => (0.3, 0.2, 0.0),
+            _ => (0.25, 0.35, 0.1),
+        };
+        let r = self.rng.f32();
+        let next = if r < rain {
+            Weather::Rain
+        } else if r < rain + fog {
+            Weather::Fog
+        } else if r < rain + fog + snow {
+            Weather::Snow
+        } else {
+            Weather::Clear
+        };
+        self.weather_t = if next == Weather::Clear { self.rng.range(60.0, 180.0) } else { self.rng.range(40.0, 120.0) };
+        if next != self.weather {
+            self.weather = next;
+            let text = match next {
+                Weather::Clear => "天候が回復した。ドローンが戻ってくる",
+                Weather::Rain => "雨が降り出した。ドローンの運用が難しくなる",
+                Weather::Fog => "濃い霧が出た。ドローンが飛べず、敵の浸透に注意",
+                Weather::Snow => "雪が降り出した。視界が落ちている",
+            };
+            self.notices.push(Notice { text: text.to_string(), side: None, x: -1.0, y: -1.0, tone: 0 });
+        }
     }
 
     /// その陣営・場所にかかっている効果を順に見る
@@ -589,7 +746,7 @@ impl World {
             })
             .collect();
         for i in tiles {
-            if matches!(self.map.terrain[i], Terrain::Plain | Terrain::Forest) {
+            if self.map.terrain[i].open() {
                 self.feat[i] |= FEAT_TRENCH;
             }
         }
@@ -731,20 +888,34 @@ impl World {
         if u.flash > 0.0 {
             return true;
         }
-        if self.concealed(u) {
-            v & (VIS_AIR | VIS_CLOSE) != 0
-        } else {
-            v != 0
+        match self.concealment(u) {
+            0 => v != 0,
+            1 => v & (VIS_AIR | VIS_CLOSE) != 0,
+            _ => v & (VIS_AIR_NEAR | VIS_CLOSE) != 0,
         }
     }
 
-    /// 森・市街・塹壕で動かずにいると、地上からは見つけにくい
-    pub fn concealed(&self, u: &Unit) -> bool {
-        if u.still < 2.0 {
-            return false;
-        }
+    /// 隠れ具合：0=見える 1=地上からは見つけにくい 2=葉の陰でドローンからも見つけにくい
+    pub fn concealment(&self, u: &Unit) -> u8 {
         let i = tidx(u.x as i32, u.y as i32);
-        matches!(self.map.terrain[i], Terrain::Forest | Terrain::Urban) || self.feat[i] & FEAT_TRENCH != 0
+        let t = self.map.terrain[i];
+        let leafy = matches!(t, Terrain::Forest | Terrain::Treeline);
+        if leafy && self.leaf_on() {
+            // 葉の下の歩兵は動いていても隠れる。車両は止まっていれば隠れる
+            if def(u.kind).pass == Pass::Inf || u.still >= 2.0 {
+                return 2;
+            }
+            return 0;
+        }
+        if u.still < 2.0 {
+            return 0;
+        }
+        // 葉のない樹林帯は隠れ場所にならない
+        if matches!(t, Terrain::Forest | Terrain::Urban) || self.feat[i] & FEAT_TRENCH != 0 {
+            1
+        } else {
+            0
+        }
     }
 
     // ------------------------------------------------------------ 命令（プレイヤーと AI の共通窓口）
@@ -928,7 +1099,7 @@ impl World {
         if self.owner[i] != side as i8 {
             return Err("自国の領土に建ててください");
         }
-        if !matches!(self.map.terrain[i], Terrain::Plain | Terrain::Forest | Terrain::Urban) {
+        if !self.map.terrain[i].land() {
             return Err("この地形には建てられない");
         }
         if self.blds.iter().any(|b| !b.dead && (b.x - x).abs() < 3.0 && (b.y - y).abs() < 3.0) {
@@ -1032,6 +1203,8 @@ impl World {
         }
         if tk % 20 == 0 {
             self.update_season();
+            self.update_weather(1.0);
+            self.repair_rails();
             self.economy(1.0);
             self.run_history();
             for s in 0..2u8 {
@@ -1147,24 +1320,40 @@ impl World {
         }
     }
 
-    fn speed_of(&self, u: &Unit) -> f32 {
+    pub(crate) fn speed_of(&self, u: &Unit) -> f32 {
         let d = def(u.kind);
         let mut s = d.speed;
         if d.pass == Pass::Air || d.pass == Pass::Sea {
             return s;
         }
         let i = tidx(u.x as i32, u.y as i32);
-        let on_road = self.map.road[i];
+        // 自国の線路の上は列車で運べる。敵地の線路は道路と同じ
+        let own_rail = self.map.rail[i] && self.owner[i] == u.side as i8;
+        let on_road = self.map.road[i] || self.map.rail[i];
+        let veh = d.pass == Pass::Veh;
+        let ground = self.map.ground;
         match self.map.terrain[i] {
             Terrain::River => s *= 0.3,
-            Terrain::Forest if !on_road => s *= if d.pass == Pass::Veh { 0.6 } else { 0.8 },
-            Terrain::Urban if d.pass == Pass::Veh && !on_road => s *= 0.8,
+            Terrain::Forest if !on_road => s *= if veh { 0.6 } else { 0.8 },
+            Terrain::Urban if veh && !on_road => s *= 0.8,
+            Terrain::Treeline if veh && !on_road => s *= 0.85,
+            Terrain::Hill if !on_road => s *= if veh { 0.7 } else { 0.85 },
+            // 湿地は凍ればほぼ平地と同じ
+            Terrain::Marsh if !on_road && ground != Ground::Frozen => s *= if veh { 0.3 } else { 0.5 },
             _ => {}
         }
-        if on_road {
+        if own_rail {
+            s *= 1.9;
+        } else if on_road {
             s *= 1.4;
-        } else if self.mud() && d.pass == Pass::Veh {
-            s *= 0.55;
+        } else {
+            match ground {
+                // 泥濘：装軌はなんとか進めるが、装輪はほとんど動けない。歩兵も足を取られる
+                Ground::Mud => s *= if !veh { 0.8 } else if is_wheeled(u.kind) { 0.28 } else { 0.5 },
+                // 凍結：地面が固くて走りやすい
+                Ground::Frozen if veh => s *= 1.15,
+                _ => {}
+            }
         }
         if !u.supplied {
             s *= 0.75;
@@ -1294,6 +1483,12 @@ impl World {
         });
         // 通信途絶は妨害と同じように効き、衛星通信があれば妨害に強い
         let outage = self.has_outage(side, x, y);
+        // 悪天候では FPV が落ちやすい
+        let wx = weather_fx(self.weather);
+        if k == UK::Fpv && wx.drone_crash > 0.0 && self.rng.chance(wx.drone_crash) {
+            self.units[i].dead = true;
+            return;
+        }
         if jammed || outage {
             let link = if self.has_uplink(side) { 0.5 } else { 1.0 };
             let p = if k == UK::Fpv { 0.28 } else if k == UK::LongDrone { 0.05 } else { 0.1 } * link;
@@ -1606,6 +1801,7 @@ impl World {
             } else if self.has_uplink(side) {
                 reload_mul *= 0.8;
             }
+            reload_mul *= weather_fx(self.weather).drone_reload;
         }
         {
             let u = &mut self.units[i];
@@ -1707,10 +1903,15 @@ impl World {
             match t {
                 Terrain::Urban => p *= 0.65,
                 Terrain::Forest => p *= 0.8,
+                // 樹林帯は破片を防ぎ、ボタ山や高地は守りやすい
+                Terrain::Treeline => p *= 0.85,
+                Terrain::Hill => p *= 0.8,
                 _ => {}
             }
         } else if trench {
             p *= 0.75;
+        } else if t == Terrain::Hill {
+            p *= 0.9;
         }
         for k in self.mods_at(u.side, u.x, u.y) {
             if let ModKind::Protect(m) = k {
@@ -1729,6 +1930,46 @@ impl World {
             self.fx.push(Fx { kind: FxKind::BigBlast, x, y, x2: x, y2: y, side: from, r: 2.2 });
             self.add_scar(x, y, 2.5);
             self.notices.push(Notice { text: format!("{}の{}が破壊された", SIDE_NAMES[s as usize], bdef(k).name), side: None, x, y, tone: if Some(s) == self.player { 2 } else { 1 } });
+        }
+    }
+
+    /// 周りの線路を切る。secs 秒後に復旧する
+    pub fn cut_rail(&mut self, x: f32, y: f32, r: f32, secs: f32) {
+        let ri = r.ceil() as i32;
+        let mut any = false;
+        for dy in -ri..=ri {
+            for dx in -ri..=ri {
+                let (px, py) = (x as i32 + dx, y as i32 + dy);
+                if in_map(px, py) && self.map.rail[tidx(px, py)] {
+                    let t = tidx(px, py);
+                    self.map.rail[t] = false;
+                    self.rail_cuts.push((t as u32, self.t + secs));
+                    any = true;
+                }
+            }
+        }
+        if any {
+            self.recent.clear();
+        }
+    }
+
+    /// 切られた線路を直す（どちらの陣営でも鉄道部隊がすぐ復旧に来る）
+    pub(crate) fn repair_rails(&mut self) {
+        let now = self.t;
+        let mut done = false;
+        let map = &mut self.map;
+        self.rail_cuts.retain(|&(t, at)| {
+            if now < at {
+                return true;
+            }
+            if !matches!(map.terrain[t as usize], Terrain::River | Terrain::Sea) {
+                map.rail[t as usize] = true;
+                done = true;
+            }
+            false
+        });
+        if done {
+            self.recent.clear();
         }
     }
 
@@ -1776,6 +2017,10 @@ impl World {
             }
             // 橋（巻き添えでは落ちにくい。狙って撃てば落とせる）
             self.damage_bridges(x, y, reach, bm * dmg * 0.3);
+            // 線路は爆発で切れる
+            if bm * dmg >= 40.0 {
+                self.cut_rail(x, y, reach, RAIL_REPAIR);
+            }
         }
     }
 
@@ -1807,6 +2052,7 @@ impl World {
                 for t in tiles {
                     self.map.terrain[t as usize] = under;
                     self.map.road[t as usize] = false;
+                    self.map.rail[t as usize] = false;
                     self.dirty.push(t);
                     if under == Terrain::Sea {
                         self.owner[t as usize] = -1;
@@ -2003,6 +2249,8 @@ impl World {
         self.units[i].goal = None;
         self.units[i].path.clear();
         let time = match job.kind {
+            // 凍った地面はほとんど掘れない
+            JobKind::Trench if self.map.ground == Ground::Frozen => 4.0,
             JobKind::Trench => 1.2,
             JobKind::Mine => 1.0,
             JobKind::Teeth => 1.8,
@@ -2019,20 +2267,20 @@ impl World {
         let t = self.map.terrain[ti];
         match job.kind {
             JobKind::Trench => {
-                if matches!(t, Terrain::Plain | Terrain::Forest | Terrain::Urban) {
+                if t.land() {
                     self.feat[ti] |= FEAT_TRENCH;
                     self.dirty.push(ti as u32);
                 }
             }
             JobKind::Teeth => {
-                if matches!(t, Terrain::Plain | Terrain::Forest) {
+                if t.open() {
                     self.feat[ti] |= FEAT_TEETH;
                     self.dirty.push(ti as u32);
                     self.recent.clear();
                 }
             }
             JobKind::Mine => {
-                if matches!(t, Terrain::Plain | Terrain::Forest | Terrain::Urban) && self.sides[side as usize].funds >= 8.0 {
+                if t.land() && self.sides[side as usize].funds >= 8.0 {
                     self.sides[side as usize].funds -= 8.0;
                     self.mines[ti] = side + 1;
                     self.dirty.push(ti as u32);
@@ -2061,10 +2309,11 @@ impl World {
         };
         let ti = tidx(x, y);
         if matches!(kind, UK::Infantry | UK::Atgm | UK::FpvTeam | UK::Engineer) && still > 2.0 && self.units[i].supplied {
-            let rate = if kind == UK::Engineer { 0.2 } else { 0.05 };
+            let frost = if self.map.ground == Ground::Frozen { 0.25 } else { 1.0 };
+            let rate = if kind == UK::Engineer { 0.2 } else { 0.05 } * frost;
             let u = &mut self.units[i];
             u.dig = (u.dig + rate).min(1.0);
-            if u.dig >= 1.0 && self.feat[ti] & FEAT_TRENCH == 0 && matches!(self.map.terrain[ti], Terrain::Plain | Terrain::Forest | Terrain::Urban) {
+            if u.dig >= 1.0 && self.feat[ti] & FEAT_TRENCH == 0 && self.map.terrain[ti].land() {
                 self.feat[ti] |= FEAT_TRENCH;
                 self.dirty.push(ti as u32);
             }
@@ -2192,6 +2441,7 @@ impl World {
 
     pub fn update_vision(&mut self) {
         let n = W * H;
+        let wx = weather_fx(self.weather);
         for s in 0..2 {
             let v = &mut self.vis[s];
             let own = s as i8;
@@ -2205,11 +2455,15 @@ impl World {
                 continue;
             }
             let d = def(u.kind);
-            let bit = if d.pass == Pass::Air { VIS_AIR | VIS_GROUND } else { VIS_GROUND };
             let (x, y, s) = (u.x, u.y, u.side as usize);
-            stamp_vis(&mut self.vis[s], x, y, d.vision, bit);
-            if d.pass != Pass::Air {
-                stamp_vis(&mut self.vis[s], x, y, 6.0, VIS_CLOSE);
+            if d.pass == Pass::Air {
+                stamp_vis(&mut self.vis[s], x, y, d.vision * wx.air_vis, VIS_AIR | VIS_GROUND);
+                stamp_vis(&mut self.vis[s], x, y, d.vision * wx.air_vis * 0.3, VIS_AIR_NEAR);
+            } else {
+                // 高地やボタ山からは遠くまで見える
+                let high = self.map.terrain[tidx(x as i32, y as i32)] == Terrain::Hill;
+                stamp_vis(&mut self.vis[s], x, y, d.vision * wx.ground_vis * if high { 1.4 } else { 1.0 }, VIS_GROUND);
+                stamp_vis(&mut self.vis[s], x, y, 6.0 * wx.ground_vis.max(0.6), VIS_CLOSE);
             }
         }
         for b in &self.blds {
@@ -2220,7 +2474,7 @@ impl World {
             stamp_vis(&mut self.vis[c.owner as usize], c.x, c.y, 10.0, VIS_GROUND);
         }
         for s in &self.sats {
-            stamp_vis(&mut self.vis[s.0 as usize], s.1, s.2, 24.0, VIS_AIR | VIS_GROUND | VIS_CLOSE);
+            stamp_vis(&mut self.vis[s.0 as usize], s.1, s.2, 24.0, VIS_AIR | VIS_GROUND | VIS_CLOSE | VIS_AIR_NEAR);
         }
         for b in &mut self.blds {
             let i = tidx(b.x as i32, b.y as i32);
@@ -2467,7 +2721,16 @@ impl World {
                     for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                         if in_map(x + dx, y + dy) {
                             let t = tidx(x + dx, y + dy);
-                            if self.owner[t] == side as i8 && (sup[t] as usize) < r - 1 {
+                            if self.owner[t] != side as i8 {
+                                continue;
+                            }
+                            // つながった線路の上では補給が弱まらずに遠くまで届く
+                            if self.map.rail[c] && self.map.rail[t] {
+                                if (sup[t] as usize) < r {
+                                    sup[t] = r as u8;
+                                    buckets[r].push(t);
+                                }
+                            } else if (sup[t] as usize) < r - 1 {
                                 sup[t] = (r - 1) as u8;
                                 buckets[r - 1].push(t);
                             }

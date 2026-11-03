@@ -426,7 +426,7 @@ impl World {
                 continue;
             }
             let ti = tidx(px, py);
-            if self.owner[ti] != side as i8 || self.feat[ti] & (FEAT_TRENCH | FEAT_TEETH) != 0 || self.map.terrain[ti] != Terrain::Plain {
+            if self.owner[ti] != side as i8 || self.feat[ti] & (FEAT_TRENCH | FEAT_TEETH) != 0 || !matches!(self.map.terrain[ti], Terrain::Plain | Terrain::Treeline) {
                 continue;
             }
             jobs.push((px as u16, py as u16));
@@ -527,6 +527,17 @@ impl World {
         }
         let s = side as usize;
         let (x, y) = (self.units[i].x, self.units[i].y);
+        // ときどき敵地の線路を狙って補給を断つ
+        if self.rng.chance(0.35) && !self.map.rail_lines.is_empty() {
+            let line = &self.map.rail_lines[self.rng.below(self.map.rail_lines.len() as u32) as usize];
+            let p = line[self.rng.below(line.len() as u32) as usize];
+            let (px, py) = (p.0 as i32, p.1 as i32);
+            if in_map(px, py) && self.owner[tidx(px, py)] >= 0 && self.owner[tidx(px, py)] != side as i8 && self.map.rail[tidx(px, py)] {
+                let id = self.units[i].id;
+                self.attack_ground(&[id], p.0, p.1);
+                return;
+            }
+        }
         let t = self
             .blds
             .iter()

@@ -563,3 +563,302 @@ fn broken_saves_are_rejected_not_crashes() {
         let _ = World::load_bytes(&d);
     }
 }
+
+fn at_date(w: &mut World, y: u32, m: u32, d: u32) {
+    let target = date_to_day(y, m, d);
+    while w.day() < target {
+        w.t += 1.0;
+    }
+    w.mud_until = 0;
+    w.update_season();
+}
+
+/// 平地の上の部隊の速さを測る
+fn plain_speed(w: &mut World, k: UK) -> f32 {
+    let p = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Plain && !w.map.road[i]).unwrap();
+    let id = w.spawn(k, 0, (p % W) as f32 + 0.5, (p / W) as f32 + 0.5);
+    let u = w.unit(id).unwrap();
+    let s = w.speed_of(u);
+    let i = w.unit_index(id).unwrap();
+    w.units[i].dead = true;
+    s
+}
+
+#[test]
+fn ground_follows_the_calendar() {
+    assert_eq!(World::ground_of_date(1, 10), Ground::Frozen);
+    assert_eq!(World::ground_of_date(3, 20), Ground::Mud);
+    assert_eq!(World::ground_of_date(7, 1), Ground::Normal);
+    assert_eq!(World::ground_of_date(10, 20), Ground::Mud);
+    assert_eq!(World::ground_of_date(12, 1), Ground::Normal);
+    assert_eq!(World::ground_of_date(12, 20), Ground::Frozen);
+}
+
+#[test]
+fn mud_hurts_wheels_most_and_frost_helps() {
+    let mut w = quiet(61);
+    at_date(&mut w, 2023, 7, 1);
+    let (tank, truck) = (plain_speed(&mut w, UK::Tank) / def(UK::Tank).speed, plain_speed(&mut w, UK::Mlrs) / def(UK::Mlrs).speed);
+    assert_eq!(tank, truck);
+    let dry = tank;
+    at_date(&mut w, 2023, 10, 20);
+    let (tank, truck) = (plain_speed(&mut w, UK::Tank) / def(UK::Tank).speed, plain_speed(&mut w, UK::Mlrs) / def(UK::Mlrs).speed);
+    assert!(truck < tank && tank < dry, "泥濘で装輪が最も遅いはず: 乾 {dry} 装軌 {tank} 装輪 {truck}");
+    at_date(&mut w, 2024, 1, 10);
+    assert!(plain_speed(&mut w, UK::Tank) / def(UK::Tank).speed > dry, "凍結で速くなるはず");
+}
+
+#[test]
+fn mud_keeps_vehicles_on_roads_when_pathing() {
+    let mut w = quiet(62);
+    let i = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Plain && !w.map.road[i]).unwrap();
+    let r = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Plain && w.map.road[i] && !w.map.rail[i]).unwrap();
+    at_date(&mut w, 2023, 7, 1);
+    let dry = w.map.cost(i, crate::geo::Pass::Veh).unwrap();
+    at_date(&mut w, 2023, 10, 20);
+    let wet = w.map.cost(i, crate::geo::Pass::Veh).unwrap();
+    assert!(wet > dry * 2.0);
+    assert_eq!(w.map.cost(r, crate::geo::Pass::Veh), Some(0.6), "道路は泥濘でも変わらない");
+}
+
+#[test]
+fn map_has_marsh_treelines_and_hills() {
+    let w = quiet(63);
+    let count = |t: Terrain| w.map.terrain.iter().filter(|x| **x == t).count();
+    println!("湿地 {} 樹林帯 {} 高地 {} 森 {} 平地 {}", count(Terrain::Marsh), count(Terrain::Treeline), count(Terrain::Hill), count(Terrain::Forest), count(Terrain::Plain));
+    assert!(count(Terrain::Marsh) > 100);
+    assert!(count(Terrain::Treeline) > 500);
+    assert!(count(Terrain::Hill) > 200);
+}
+
+#[test]
+fn frozen_marsh_opens_to_vehicles() {
+    let mut w = quiet(64);
+    let i = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Marsh && !w.map.road[i]).unwrap();
+    at_date(&mut w, 2023, 7, 1);
+    let summer = w.map.cost(i, crate::geo::Pass::Veh).unwrap();
+    at_date(&mut w, 2024, 1, 10);
+    let frozen = w.map.cost(i, crate::geo::Pass::Veh).unwrap();
+    assert!(frozen < summer / 3.0);
+}
+
+#[test]
+fn foliage_hides_infantry_from_drones_only_when_in_leaf() {
+    let seen = |y: u32, m: u32| {
+        let mut w = quiet(65);
+        at_date(&mut w, y, m, 10);
+        w.weather = Weather::Clear;
+        w.weather_t = 1e6;
+        let t = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Treeline && w.map.start_owner[i] == 1).unwrap();
+        let (x, y) = ((t % W) as f32 + 0.5, (t / W) as f32 + 0.5);
+        let inf = w.spawn(UK::Infantry, 1, x, y);
+        // 偵察機は少し離れて飛ぶ（真下ではない）
+        w.spawn(UK::ReconDrone, 0, x + 10.0, y);
+        w.units.iter_mut().for_each(|u| {
+            u.auto = false;
+            u.still = 5.0;
+        });
+        w.update_vision();
+        let u = w.unit(inf).unwrap();
+        w.can_see(0, u)
+    };
+    assert!(!seen(2023, 7), "夏の樹林帯の歩兵は上空から見つけにくい");
+    assert!(seen(2024, 1), "冬の樹林帯は丸見え");
+}
+
+#[test]
+fn fog_blinds_drones() {
+    let reach = |wx: Weather| {
+        let mut w = quiet(66);
+        w.weather = wx;
+        w.weather_t = 1e6;
+        let t = (0..W * H).find(|&i| w.map.start_owner[i] == 1 && w.map.terrain[i] == Terrain::Plain).unwrap();
+        let (x, y) = ((t % W) as f32 + 0.5, (t / W) as f32 + 0.5);
+        let tank = w.spawn(UK::Tank, 1, x, y);
+        w.spawn(UK::ReconDrone, 0, x + 9.0, y);
+        w.units.iter_mut().for_each(|u| u.auto = false);
+        w.update_vision();
+        let u = w.unit(tank).unwrap();
+        w.can_see(0, u)
+    };
+    assert!(reach(Weather::Clear));
+    assert!(!reach(Weather::Fog));
+}
+
+#[test]
+fn frozen_ground_slows_digging() {
+    let time_to_dig = |y: u32, m: u32| {
+        let mut w = quiet(67);
+        at_date(&mut w, y, m, 10);
+        let t = (0..W * H).find(|&i| w.map.terrain[i] == Terrain::Plain && w.map.start_owner[i] == 0 && !w.map.road[i]).unwrap();
+        let id = w.spawn(UK::Infantry, 0, (t % W) as f32 + 0.5, (t / W) as f32 + 0.5);
+        w.units.iter_mut().for_each(|u| u.auto = false);
+        let start = w.t;
+        for _ in 0..20 * 400 {
+            w.tick();
+            if w.unit(id).is_some_and(|u| u.dig >= 1.0) {
+                break;
+            }
+        }
+        w.t - start
+    };
+    assert!(time_to_dig(2024, 1) > time_to_dig(2023, 7) * 2.0);
+}
+
+#[test]
+fn hills_see_farther() {
+    let sees = |terrain: Terrain| {
+        let mut w = quiet(68);
+        w.weather = Weather::Clear;
+        w.weather_t = 1e6;
+        let t = (0..W * H).find(|&i| w.map.terrain[i] == terrain && w.map.start_owner[i] == 1).unwrap();
+        let (x, y) = ((t % W) as f32 + 0.5, (t / W) as f32 + 0.5);
+        w.spawn(UK::Infantry, 0, x, y);
+        w.update_vision();
+        let far = (x as i32 + 10).min(W as i32 - 1);
+        w.vis[0][tidx(far, y as i32)] != 0
+    };
+    assert!(sees(Terrain::Hill) && !sees(Terrain::Plain));
+}
+
+#[test]
+fn snow_only_falls_in_the_cold() {
+    let mut w = quiet(69);
+    at_date(&mut w, 2023, 7, 1);
+    for _ in 0..300 {
+        w.weather_t = 0.0;
+        w.update_weather(1.0);
+        assert_ne!(w.weather, Weather::Snow, "真夏に雪");
+    }
+    w.notices.clear();
+    at_date(&mut w, 2024, 1, 10);
+    let mut snow = 0;
+    for _ in 0..300 {
+        w.weather_t = 0.0;
+        w.update_weather(1.0);
+        if w.weather == Weather::Snow {
+            snow += 1;
+        }
+    }
+    assert!(snow > 30);
+}
+
+#[test]
+fn weather_and_ground_survive_save() {
+    let mut w = sim(70, WAR_SECONDS);
+    w.mud_until = 500;
+    w.weather = Weather::Fog;
+    w.weather_t = 42.0;
+    let b = World::load_bytes(&w.save_bytes()).unwrap();
+    assert_eq!(b.weather, Weather::Fog);
+    assert_eq!(b.weather_t, 42.0);
+    assert_eq!(b.mud_until, 500);
+    assert!(b.mud());
+    assert!(b.notices.is_empty());
+}
+
+fn rail_reach(w: &World, from: &str, to: &str) -> bool {
+    let c = |n: &str| {
+        let c = w.map.cities.iter().find(|c| c.name == n).unwrap();
+        (c.x as i32, c.y as i32)
+    };
+    let (a, b) = (c(from), c(to));
+    let near = |p: (i32, i32)| {
+        for r in 0..5i32 {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if in_map(p.0 + dx, p.1 + dy) && w.map.rail[tidx(p.0 + dx, p.1 + dy)] {
+                        return Some(tidx(p.0 + dx, p.1 + dy));
+                    }
+                }
+            }
+        }
+        None
+    };
+    let (Some(s), Some(e)) = (near(a), near(b)) else { return false };
+    let mut seen = vec![false; W * H];
+    let mut st = vec![s];
+    seen[s] = true;
+    while let Some(i) = st.pop() {
+        if i == e {
+            return true;
+        }
+        let (x, y) = ((i % W) as i32, (i / W) as i32);
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            if in_map(x + dx, y + dy) {
+                let t = tidx(x + dx, y + dy);
+                if w.map.rail[t] && !seen[t] {
+                    seen[t] = true;
+                    st.push(t);
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn rail_network_is_connected() {
+    let w = quiet(81);
+    for (a, b) in [("リヴィア", "キエヴァ"), ("キエヴァ", "ハルキア"), ("キエヴァ", "オデスカ"), ("ハルキア", "ロストヴァ"), ("ドニプロヴァ", "シンフェラ"), ("ヴォロニア", "ロストヴァ"), ("ケルチャ", "クラスノーダ"), ("セヴァストラ", "ケルチャ")] {
+        assert!(rail_reach(&w, a, b), "{a}〜{b} が鉄道でつながっていない");
+    }
+}
+
+#[test]
+fn rail_carries_supply_and_cutting_starves_the_line() {
+    let mut w = quiet(82);
+    // ウクラヴィアの建物と、キエヴァ以外の都市を消して、鉄道だけで届くか調べる
+    w.blds.clear();
+    for c in w.map.cities.iter_mut() {
+        if c.owner == 0 && c.name != "キエヴァ" {
+            c.owner = 1;
+        }
+    }
+    // ポルタの先の線路（キエヴァから遠い）
+    let k = w.map.cities.iter().find(|c| c.name == "キエヴァ").map(|c| (c.x, c.y)).unwrap();
+    let line = w.map.rail_lines.iter().find(|l| {
+        let a = l[0];
+        (a.0 - k.0).abs() < 2.0 && (a.1 - k.1).abs() < 2.0 && l.last().is_some_and(|e| e.0 > k.0 + 20.0)
+    }).unwrap().clone();
+    let far = line[line.len() - 8];
+    let ti = tidx(far.0 as i32, far.1 as i32);
+    w.update_supply();
+    let dist = ((far.0 - k.0).powi(2) + (far.1 - k.1).powi(2)).sqrt();
+    assert!(dist > 26.0, "都市の補給だけでは届かない距離のはず: {dist}");
+    assert!(w.supply[0][ti] > 0, "線路で補給が届いていない");
+    // 線路網には迂回路があるので、全部切ると届かなくなることで確かめる
+    w.cut_rail(W as f32 / 2.0, H as f32 / 2.0, 400.0, 45.0);
+    w.update_supply();
+    assert_eq!(w.supply[0][ti], 0, "線路を切っても補給が届いている");
+    assert!(!w.rail_cuts.is_empty());
+    // 時間がたつと復旧する
+    w.t += 46.0;
+    w.repair_rails_for_test();
+    w.update_supply();
+    assert!(w.supply[0][ti] > 0, "復旧していない");
+}
+
+#[test]
+fn own_rail_moves_units_faster() {
+    let mut w = quiet(83);
+    at_date(&mut w, 2023, 7, 1);
+    let t = (0..W * H).find(|&i| w.map.rail[i] && w.map.start_owner[i] == 0 && !w.map.road[i] && w.map.terrain[i] == Terrain::Plain).unwrap();
+    let (x, y) = ((t % W) as f32 + 0.5, (t / W) as f32 + 0.5);
+    let own = w.spawn(UK::Tank, 0, x, y);
+    let enemy = w.spawn(UK::Tank, 1, x, y);
+    let road = w.unit(enemy).map(|u| w.speed_of(u)).unwrap();
+    let train = w.unit(own).map(|u| w.speed_of(u)).unwrap();
+    assert!(train > road, "自国の線路の方が速いはず");
+}
+
+#[test]
+fn rail_cuts_survive_save() {
+    let mut w = quiet(84);
+    let t = (0..W * H).find(|&i| w.map.rail[i]).unwrap();
+    w.cut_rail((t % W) as f32, (t / W) as f32, 1.0, 45.0);
+    assert!(!w.rail_cuts.is_empty());
+    let b = World::load_bytes(&w.save_bytes()).unwrap();
+    assert_eq!(b.rail_cuts.len(), w.rail_cuts.len());
+    assert!(b.map.rail == w.map.rail);
+}

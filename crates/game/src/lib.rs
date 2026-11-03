@@ -286,6 +286,7 @@ impl Game {
             Screen::Play => {
                 self.draw_world(g);
                 g.set_screen_xform();
+                self.draw_weather(g);
                 self.draw_hud(g);
             }
             Screen::Result => {
@@ -890,7 +891,7 @@ impl Game {
                 continue;
             }
             let ter = w.map.terrain[tidx(x, y)];
-            let ok = if kind == JobKind::Pontoon { ter == Terrain::River } else { matches!(ter, Terrain::Plain | Terrain::Forest | Terrain::Urban) };
+            let ok = if kind == JobKind::Pontoon { ter == Terrain::River } else { ter.land() };
             if ok && !tiles.contains(&(x as u16, y as u16)) {
                 tiles.push((x as u16, y as u16));
             }

@@ -524,6 +524,11 @@ pub fn def(k: UK) -> &'static UDef {
     &DEFS[k as usize]
 }
 
+/// 装輪車両か（泥濘に特に弱い）
+pub fn is_wheeled(k: UK) -> bool {
+    matches!(k, UK::Mlrs | UK::Coastal | UK::Sam | UK::Ew)
+}
+
 /// 陣営ごとの値段（ウクラヴィアはドローン・対戦車が安く、ロスコヴィアは火砲・戦車が安い）
 pub fn unit_cost(side: u8, k: UK) -> f32 {
     let c = def(k).cost;
