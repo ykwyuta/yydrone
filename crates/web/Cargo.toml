@@ -1,0 +1,11 @@
+[package]
+name = "yydrone-web"
+description = "ドローン戦線 ブラウザ版（WebAssembly + WebGL2 / Canvas2D）"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+yydrone-game = { path = "../game" }

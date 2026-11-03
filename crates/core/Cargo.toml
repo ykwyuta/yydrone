@@ -1,0 +1,7 @@
+[package]
+name = "yydrone-core"
+description = "ドローン戦線のシミュレーション本体（描画に依存しない）"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

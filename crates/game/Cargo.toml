@@ -1,0 +1,8 @@
+[package]
+name = "yydrone-game"
+description = "ドローン戦線の画面・入力・描画（Gfx トレイト越しに両版で共有）"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+yydrone-core = { path = "../core" }

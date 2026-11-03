@@ -1,0 +1,10 @@
+{
+  "name": "yydrone",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ドローン戦線 — 架空の国々の現代戦を描くリアルタイムストラテジー（Rust → WebAssembly のブラウザ版）",
+  "scripts": {
+    "build": "bash build.sh",
+    "deploy": "bash build.sh && npx wrangler deploy"
+  }
+}
