@@ -15,7 +15,7 @@ jobs:
       - name: Test (shared simulation)
         env:
           SIM_SEEDS: "2"
-        run: cargo test --release -p yydrone-core
+        run: cargo test --release -p yydrone-core -p yydrone-game
 
   web:
     runs-on: ubuntu-latest

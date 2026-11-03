@@ -6,6 +6,9 @@ mod paint;
 pub mod ui;
 mod view;
 
+#[cfg(test)]
+mod tests;
+
 use gfx::*;
 use std::collections::VecDeque;
 use view::{Particle, Streak};
@@ -87,6 +90,9 @@ pub struct Game {
     last_click: (f32, f32, f32),
     // 選択と命令
     pub selected: Vec<u32>,
+    /// 指揮中：自軍の部隊を選んでから命令を出すまで時間を止める
+    pub cmd_pause: bool,
+    last_sel: Vec<u32>,
     pub sel_bld: Option<u32>,
     pub groups: [Vec<u32>; 10],
     pub mode: Mode,
@@ -157,6 +163,8 @@ impl Game {
             minimap_drag: false,
             last_click: (0.0, 0.0, -10.0),
             selected: Vec::new(),
+            cmd_pause: false,
+            last_sel: Vec::new(),
             sel_bld: None,
             groups: Default::default(),
             mode: Mode::Normal,
@@ -299,7 +307,8 @@ impl Game {
 
     fn advance(&mut self, g: &mut dyn Gfx, dt: f32) {
         self.anim += dt;
-        let frozen = self.paused || self.modal_open();
+        self.update_cmd_pause();
+        let frozen = self.paused || self.modal_open() || self.cmd_hold();
         // 自動記録（2分ごと）
         if !frozen {
             self.autosave_t += dt;
@@ -566,6 +575,25 @@ impl Game {
         }
     }
 
+    /// 自軍の部隊を新たに選ぶと時間を止め、命令を出すと再開する
+    fn update_cmd_pause(&mut self) {
+        if self.selected != self.last_sel {
+            // 戦死などで減っただけなら選び直しとはみなさない
+            if self.selected.iter().any(|id| !self.last_sel.contains(id)) {
+                self.cmd_pause = true;
+            }
+            self.last_sel = self.selected.clone();
+        }
+        if self.selected.is_empty() {
+            self.cmd_pause = false;
+        }
+    }
+
+    /// 時間を止めているか（部隊の選択中・範囲選択のドラッグ中）
+    pub fn cmd_hold(&self) -> bool {
+        self.cmd_pause || self.drag_box().is_some()
+    }
+
     pub fn modal_open(&self) -> bool {
         self.show_help || self.show_brief || self.show_chron || self.show_save
     }
@@ -680,16 +708,19 @@ impl Game {
             Stop => {
                 w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
                 w.command(&ids, Cmd::Stop, 0.0, 0.0);
+                self.cmd_pause = false;
             }
             Hold => {
                 w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
                 w.command(&ids, Cmd::Hold, 0.0, 0.0);
+                self.cmd_pause = false;
             }
             MoveOnly => self.mode = Mode::MoveOnly,
             AttackGround => self.mode = Mode::AttackGround,
             Delegate => {
                 let all = ids.iter().all(|id| w.unit(*id).is_some_and(|u| u.auto));
                 w.command(&ids, Cmd::Auto(!all), 0.0, 0.0);
+                self.cmd_pause = false;
                 self.message(if all { "AI 委任を解除した" } else { "選んだ部隊を AI の将軍に委任した" });
             }
             Job(k) => {
@@ -805,6 +836,7 @@ impl Game {
         }
         // 委任を解いて直接指揮する
         w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
+        self.cmd_pause = false;
         if let Some(t) = tgt {
             w.attack_target(&ids, t);
             self.ping(wx, wy, [1.0, 0.4, 0.3]);
@@ -846,12 +878,14 @@ impl Game {
             Mode::MoveOnly => {
                 w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
                 w.command(&ids, Cmd::Move, wx, wy);
+                self.cmd_pause = false;
                 self.ping(wx, wy, [0.7, 1.0, 1.0]);
                 self.mode = Mode::Normal;
             }
             Mode::AttackGround => {
                 w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
                 w.attack_ground(&ids, wx, wy);
+                self.cmd_pause = false;
                 self.ping(wx, wy, [1.0, 0.5, 0.3]);
                 self.mode = Mode::Normal;
             }
@@ -902,6 +936,7 @@ impl Game {
         }
         w.command(&ids, Cmd::Auto(false), 0.0, 0.0);
         w.add_jobs(&ids, kind, &tiles);
+        self.cmd_pause = false;
         if !self.keys[0x10] {
             self.mode = Mode::Normal;
         }
