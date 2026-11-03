@@ -28,4 +28,3 @@ Use case: stylized-concept. Asset type: transparent isometric city sprite for an
 ```
 
 残り9都市の正確なプロンプトは `city-prompts.json` に保存。
-
