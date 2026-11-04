@@ -353,6 +353,7 @@ fn phone_top_bar_opens_headquarters_with_no_generals_and_while_producing_or_sele
         for production in [false,true] {
             for selection in [false,true] {
                 let (mut game,mut gfx)=game();game.compact=true;game.touch=true;gfx.dimensions=Some(dimensions);
+                for s in &mut game.world.as_mut().unwrap().sides {s.command=Default::default();}
                 game.show_prod=production;game.command_tab=1;game.command_detail_tab=2;
                 if selection {game.selected.push(game.world.as_ref().unwrap().units.iter().find(|u|u.side==0).unwrap().id);}
                 game.frame(&mut gfx,&[],0.0);

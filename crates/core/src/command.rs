@@ -4,6 +4,7 @@ use crate::geo::*;
 use crate::world::*;
 use std::collections::VecDeque;
 mod proposals;
+mod deployment;
 pub use proposals::{GeneralProposal, ProposalPart};
 pub const GENERAL_COUNT: usize = 9;
 pub const DIRECT_COMMAND: u8 = GENERAL_COUNT as u8;

@@ -171,6 +171,7 @@ fn quiet(seed: u64) -> World {
     let mut w = sim(seed, 5000.0);
     w.sides[0].ai = false;
     w.sides[1].ai = false;
+    for s in &mut w.sides {s.command=Default::default();}
     w.units.clear();
     w
 }

@@ -10,6 +10,7 @@ fn world() -> World {
         player: Some(0),
     });
     for s in &mut w.sides {
+        s.command=Default::default();
         s.ai = false;
         s.auto_buy = false;
         for g in &mut s.command.generals {
@@ -31,6 +32,58 @@ fn legacy_v3_fixture_loads_without_losing_the_old_armies() {
         .iter()
         .all(|g| g.budget == 0.0 && g.units.is_empty())));
     assert!(World::load_bytes(&w.save_bytes()).is_ok());
+}
+
+#[test]
+fn new_campaign_deploys_all_generals_with_existing_units_and_keeps_a_reserve() {
+    for player in [None,Some(0),Some(1)] {
+        for seed in [5,17,42] {
+            let w=World::new(Settings{seed,duration:7200.0,ai_mult:1.0,player});
+            let mut owned=std::collections::HashSet::new();
+            for side in 0..2u8 {
+                let c=&w.sides[side as usize].command;
+                for general in &c.generals {
+                    assert!(general.region_assigned);
+                    assert!(!general.units.is_empty(),"empty general on side {side}, seed {seed}");
+                    assert!(general.units.len()<=4);
+                    assert_eq!(general.budget,0.0);
+                    assert_eq!(general.spent,0.0);
+                    for id in &general.units {
+                        let u=w.unit(*id).unwrap();
+                        assert_eq!(u.side,side);assert!(u.auto);
+                        assert!(general.region.contains(u.x,u.y),"initial unit starts outside its theater");
+                        assert!(owned.insert(*id),"unit assigned to two generals");
+                    }
+                }
+                assert!(w.units.iter().any(|u|u.side==side&&matches!(def(u.kind).pass,crate::geo::Pass::Inf|crate::geo::Pass::Veh)&&w.general_for(side,u.id).is_none()),"no ground reserve");
+                assert!(w.units.iter().filter(|u|u.side==side&&matches!(u.kind,UK::Jet|UK::Heli|UK::Frigate)).all(|u|w.general_for(side,u.id).is_none()));
+            }
+            let copy=World::load_bytes(&w.save_bytes()).unwrap();
+            assert_eq!(copy.units.len(),w.units.len());
+            for side in 0..2 {
+                assert_eq!(copy.sides[side].funds,w.sides[side].funds);
+                for gi in 0..GENERAL_COUNT {
+                    assert_eq!(copy.sides[side].command.generals[gi].units,w.sides[side].command.generals[gi].units);
+                    assert_eq!(copy.sides[side].command.generals[gi].region,w.sides[side].command.generals[gi].region);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn loading_or_training_does_not_reassign_initial_generals() {
+    let mut w=World::new(Settings{seed:17,duration:7200.0,ai_mult:1.0,player:Some(0)});
+    let id=w.sides[0].command.generals[0].units[0];
+    w.command(&[id],Cmd::Auto(false),0.0,0.0);
+    w.sides[0].command.generals[0].region=Region{x:120.0,y:80.0,radius:28.0};
+    let copy=World::load_bytes(&w.save_bytes()).unwrap();
+    assert!(copy.general_for(0,id).is_none());
+    assert_eq!(copy.sides[0].command.generals[0].region,w.sides[0].command.generals[0].region);
+    for lesson in [TrainingLesson::Welcome,TrainingLesson::Select,TrainingLesson::Delegate] {
+        let (training,_)=World::training(0,lesson);
+        assert!(training.sides.iter().flat_map(|s|s.command.generals.iter()).all(|g|!g.region_assigned&&g.units.is_empty()));
+    }
 }
 
 #[test]

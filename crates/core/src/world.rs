@@ -410,6 +410,7 @@ impl World {
         w.history.push((0.0, w.share(0)));
         w.update_season();
         w.run_history();
+        w.setup_initial_command();
         w
     }
 

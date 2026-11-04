@@ -1,5 +1,5 @@
 // Exercise the actual WASM/canvas UI in an isolated, installed headless Chromium.
-// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals | --touch]
+// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals | --touch | --deployment]
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
@@ -61,7 +61,19 @@ try {
   const clickText=async text=>{await waitFor(`window.__commandTexts.some(t=>t.text===${JSON.stringify(text)})`,text);const item=await evaluate(`window.__commandTexts.find(t=>t.text===${JSON.stringify(text)})`);await click(item.x+3,item.y+7);};
   const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'docs',`command-ui-${name}.png`),Buffer.from(data.data,'base64'));};
   const start=async(compact,width,height)=>{await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:origin+'/?compact='+Number(compact)});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'WASM load');await key('Enter','Enter',13);await key(' ','Space',32);await key('F3','F3',114);await waitFor(`window.__commandTexts.some(t=>t.text.includes('司令部 —'))`,'headquarters');};
-  if (process.argv.includes('--touch')) {
+  if (process.argv.includes('--deployment')) {
+    const names=['ヴェレス / 突破重視','ミラ / 兵力温存','オリク / 均衡調整','ルネ / 機甲集中','エダ / 火力優先','セイラ / 偵察重視','マルク / 守備重視','ノヴァ / 機動襲撃','イリス / 補給重視'];
+    for(const [compact,width,height] of [[false,1600,900],[true,1000,480]]) {
+      await start(compact,width,height);
+      for(let gi=0;gi<9;gi++) {
+        if(gi>0&&gi%3===0)await clickText('次の3人');await clickText(names[gi]);
+        await waitFor(`window.__commandTexts.some(t=>/委任 [1-4] 部隊/.test(t.text))`,'initial roster '+gi);
+      }
+      await screenshot(compact?'compact-initial-rosters':'initial-rosters');await clickText('閉じる');
+      await waitFor(`window.__commandTexts.some(t=>t.text.startsWith('担当 9人'))`,'all generals deployed');await screenshot(compact?'compact-initial-deployment':'initial-deployment');
+      console.log((compact?'Compact':'Desktop')+': all nine generals have initial troops and visible territory cards');
+    }
+  } else if (process.argv.includes('--touch')) {
     await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
     const has=value=>`window.__commandTexts.some(t=>t.text.includes(${JSON.stringify(value)}))`;
     const tap=async(x,y)=>{await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1,radiusX:3,radiusY:3,force:1}]});await sleep(90);await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await sleep(250);};
@@ -123,7 +135,7 @@ try {
       const names=['ヴェレス / 突破重視','ミラ / 兵力温存','オリク / 均衡調整','ルネ / 機甲集中','エダ / 火力優先','セイラ / 偵察重視','マルク / 守備重視','ノヴァ / 機動襲撃','イリス / 補給重視'];
       for(let gi=0;gi<9;gi++) {
         if(gi>0&&gi%3===0)await clickText('次の3人');
-        await clickText(names[gi]);await clickText('戦地を承認');
+        await clickText(names[gi]);if(await evaluate(has('戦地の変更を希望')))await clickText('戦地を承認');
       }
     };
     await prepare(false,1600,900);await screenshot('proposals');

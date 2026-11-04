@@ -488,6 +488,7 @@ impl World {
         };
         let mut w = World::new(Settings { duration, seed: 1, ai_mult: 1.0, player });
         // 新しい戦争として始まった分を捨てて、記録の状態に置きかえる
+        for side in &mut w.sides {side.command=Default::default();}
         w.units.clear();
         w.blds.clear();
         w.projs.clear();
