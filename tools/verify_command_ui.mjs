@@ -1,5 +1,5 @@
 // Exercise the actual WASM/canvas UI in an isolated, installed headless Chromium.
-// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals]
+// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals | --touch]
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
@@ -61,7 +61,23 @@ try {
   const clickText=async text=>{await waitFor(`window.__commandTexts.some(t=>t.text===${JSON.stringify(text)})`,text);const item=await evaluate(`window.__commandTexts.find(t=>t.text===${JSON.stringify(text)})`);await click(item.x+3,item.y+7);};
   const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'docs',`command-ui-${name}.png`),Buffer.from(data.data,'base64'));};
   const start=async(compact,width,height)=>{await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:origin+'/?compact='+Number(compact)});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'WASM load');await key('Enter','Enter',13);await key(' ','Space',32);await key('F3','F3',114);await waitFor(`window.__commandTexts.some(t=>t.text.includes('司令部 —'))`,'headquarters');};
-  if (process.argv.includes('--tutorial')) {
+  if (process.argv.includes('--touch')) {
+    await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+    const has=value=>`window.__commandTexts.some(t=>t.text.includes(${JSON.stringify(value)}))`;
+    const tap=async(x,y)=>{await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1,radiusX:3,radiusY:3,force:1}]});await sleep(90);await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await sleep(250);};
+    const tapText=async text=>{await waitFor(`window.__commandTexts.some(t=>t.text===${JSON.stringify(text)})`,text);const point=await evaluate(`(()=>{const t=window.__commandTexts.find(t=>t.text===${JSON.stringify(text)});const c=document.getElementById('ui');const r=c.getBoundingClientRect();return {x:r.left+(t.x+4)*r.width/c.width,y:r.top+(t.y+8)*r.height/c.height};})()`);await tap(point.x,point.y);};
+    for(const [width,height] of [[844,390],[667,375]]) {
+      await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:true});
+      await send('Page.navigate',{url:origin+'/?touch=1'});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'mobile WASM');
+      if(width===667){await tapText('A＋');await tapText('A＋');}
+      await tapText('作戦開始（2時間）');await tapText('作戦開始');await tapText('司令部');
+      await waitFor(has('司令部 —'),'touch headquarters');await tapText('全力防御');await waitFor(has('指示：全力防御'),'visible doctrine confirmation');await tapText('予算 +100');await waitFor(has('予算 100'),'touch budget');
+      await tapText('閉じる');await waitFor(has('全力防御 /'),'touch doctrine applied');await screenshot('touch-'+width);
+      await tapText('1 ヴェレス');await tapText('積極攻勢');await waitFor(has('指示：積極攻勢'),'portrait card opens orders');await tapText('地域と部隊');const oldRegion=await evaluate(`window.__commandTexts.find(t=>t.text.startsWith('担当地域：'))?.text`);await tapText('地図で中心を指定');
+      await tap(width*0.55,height*0.6);await waitFor(has('担当地域：'),'touch theater selection');const newRegion=await evaluate(`window.__commandTexts.find(t=>t.text.startsWith('担当地域：'))?.text`);if(newRegion===oldRegion)throw new Error('Touch reopened headquarters without changing the theater');await screenshot('touch-region-'+width);
+      console.log('Touch phone '+width+'x'+height+': headquarters, doctrine, budget, portrait card and theater passed');
+    }
+  } else if (process.argv.includes('--tutorial')) {
     const has = value => `window.__commandTexts.some(t=>t.text.includes(${JSON.stringify(value)}))`;
     const shot = async name => {const data=await send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'docs',`tutorial-${name}.png`),Buffer.from(data.data,'base64'));};
     const right = async (x,y) => {await send('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});await send('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'right',clickCount:1});await send('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'right',clickCount:1});await sleep(200);};

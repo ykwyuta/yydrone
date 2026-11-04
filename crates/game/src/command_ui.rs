@@ -39,7 +39,7 @@ impl Game {
                 sw - 128.0,
                 self.top_h() + 8.0,
                 116.0,
-                34.0,
+                if self.compact { 44.0 } else { 34.0 },
                 false,
                 true,
             )
@@ -51,8 +51,12 @@ impl Game {
     pub(crate) fn draw_command(&mut self, g: &mut dyn Gfx, tq: &mut TextQ, sw: f32, sh: f32) {
         let side = self.viewer.unwrap_or(0);
         let enabled = self.viewer.is_some();
-        let width = (sw - 32.0).min(1050.0);
-        let height = (sh - 78.0).min(624.0);
+        let width = (sw - if self.compact { 16.0 } else { 32.0 }).min(1050.0);
+        let height = if self.compact {
+            sh - 12.0
+        } else {
+            (sh - 78.0).min(624.0)
+        };
         let (x, y) = ((sw - width) / 2.0, (sh - height) / 2.0);
         g.rect(0.0, 0.0, sw, sh, [0.0, 0.0, 0.0, 0.8]);
         g.rect(x, y, x + width, y + height, PANEL);
@@ -71,7 +75,7 @@ impl Game {
                 g,
                 tq,
                 "閉じる",
-                x + width - 82.0,
+                x + width - if self.compact { 140.0 } else { 82.0 },
                 y + 8.0,
                 68.0,
                 30.0,
@@ -91,7 +95,7 @@ impl Game {
                     x + 16.0 + i as f32 * 146.0,
                     y + 48.0,
                     138.0,
-                    32.0,
+                    if self.compact { 40.0 } else { 32.0 },
                     self.command_tab == i,
                     true,
                 )
@@ -110,7 +114,7 @@ impl Game {
                     x + width - 306.0,
                     y + 48.0,
                     108.0,
-                    32.0,
+                    if self.compact { 40.0 } else { 32.0 },
                     false,
                     page > 0,
                 )
@@ -126,7 +130,7 @@ impl Game {
                     x + width - 188.0,
                     y + 48.0,
                     108.0,
-                    32.0,
+                    if self.compact { 40.0 } else { 32.0 },
                     false,
                     page + 1 < GENERAL_COUNT / 3,
                 )
@@ -149,9 +153,9 @@ impl Game {
                 side,
                 enabled,
                 x + 16.0,
-                y + 92.0,
+                y + if self.compact { 98.0 } else { 92.0 },
                 width - 32.0,
-                height - 104.0,
+                height - if self.compact { 110.0 } else { 104.0 },
             );
         } else {
             self.draw_staff(
@@ -160,9 +164,9 @@ impl Game {
                 side,
                 enabled,
                 x + 16.0,
-                y + 92.0,
+                y + if self.compact { 98.0 } else { 92.0 },
                 width - 32.0,
-                height - 104.0,
+                height - if self.compact { 110.0 } else { 104.0 },
             );
         }
     }
@@ -189,7 +193,7 @@ impl Game {
                     x + local as f32 * (card + 8.0),
                     y,
                     card,
-                    34.0,
+                    if self.compact { 40.0 } else { 34.0 },
                     self.command_general == i,
                     true,
                 )
@@ -209,16 +213,24 @@ impl Game {
             .filter(|c| c.owner == side && general.region.contains(c.x, c.y))
             .count();
         let selected = self.selected.len();
-        let py = y + 44.0;
+        let py = y + if self.compact { 50.0 } else { 44.0 };
         let tex = self
             .art
             .portrait_texture(g, side as usize * (GENERAL_COUNT + 1) + gi);
-        let portrait = if height >= 420.0 { 128.0 } else { 64.0 };
+        let portrait = if self.compact && height < 340.0 {
+            52.0
+        } else if height >= 420.0 {
+            128.0
+        } else {
+            64.0
+        };
         g.draw_textured(tex, x, py, x + portrait, py + portrait, [1.0; 4], true);
         tq.add(
             format!(
-                "{}将軍 — {}",
-                GENERAL_NAMES[side as usize][gi], TRAIT_NAMES[gi]
+                "{}将軍 — {}（指示：{}）",
+                GENERAL_NAMES[side as usize][gi],
+                TRAIT_NAMES[gi],
+                general.doctrine.name()
             ),
             x + portrait + 16.0,
             py,
@@ -232,7 +244,7 @@ impl Game {
             x + portrait + 16.0,
             py + 30.0,
             width - portrait - 24.0,
-            44.0,
+            if portrait < 64.0 { 28.0 } else { 44.0 },
             if portrait > 64.0 {
                 Font::Normal
             } else {
@@ -271,7 +283,7 @@ impl Game {
                     x + i as f32 * 158.0,
                     cy,
                     150.0,
-                    30.0,
+                    if self.compact { 36.0 } else { 30.0 },
                     self.command_detail_tab == i,
                     true,
                 )
@@ -280,7 +292,7 @@ impl Game {
                 self.command_detail_tab = i;
             }
         }
-        cy += 38.0;
+        cy += if self.compact { 42.0 } else { 38.0 };
         if self.command_detail_tab == 0 {
             for (i, d) in [Doctrine::Assault, Doctrine::Defend, Doctrine::Flexible]
                 .into_iter()
@@ -294,7 +306,7 @@ impl Game {
                         x + i as f32 * (card + 8.0),
                         cy,
                         card,
-                        32.0,
+                        if self.compact { 44.0 } else { 32.0 },
                         general.doctrine == d,
                         enabled,
                     )
@@ -310,7 +322,7 @@ impl Game {
                     }
                 }
             }
-            cy += 42.0;
+            cy += if self.compact { 52.0 } else { 42.0 };
             let labels = ["予算 +100", "予算 +500", "未使用予算を返還"];
             for (i, label) in labels.iter().enumerate() {
                 let afford = if i < 2 {
@@ -326,7 +338,7 @@ impl Game {
                         x + i as f32 * (card + 8.0),
                         cy,
                         card,
-                        32.0,
+                        if self.compact { 44.0 } else { 32.0 },
                         false,
                         enabled && afford,
                     )
@@ -344,7 +356,7 @@ impl Game {
                     }
                 }
             }
-            cy += 42.0;
+            cy += if self.compact { 52.0 } else { 42.0 };
         } else if self.command_detail_tab == 1 {
             tq.add(
                 format!(
@@ -361,7 +373,17 @@ impl Game {
             cy += 28.0;
             let bw = (width - 24.0) / 4.0;
             if self
-                .button(g, tq, "地図で中心を指定", x, cy, bw, 32.0, false, enabled)
+                .button(
+                    g,
+                    tq,
+                    "地図で中心を指定",
+                    x,
+                    cy,
+                    bw,
+                    if self.compact { 44.0 } else { 32.0 },
+                    false,
+                    enabled,
+                )
                 .is_some()
             {
                 self.show_command = false;
@@ -376,7 +398,7 @@ impl Game {
                         x + (j + 1) as f32 * (bw + 8.0),
                         cy,
                         bw,
-                        32.0,
+                        if self.compact { 44.0 } else { 32.0 },
                         general.region.radius == radius,
                         enabled,
                     )
@@ -388,7 +410,7 @@ impl Game {
                     }
                 }
             }
-            cy += 36.0;
+            cy += if self.compact { 48.0 } else { 36.0 };
             let labels = [
                 format!("選択 {selected} 部隊を委任"),
                 "地域内の部隊を委任".into(),
@@ -403,7 +425,7 @@ impl Game {
                         x + j as f32 * (card + 8.0),
                         cy,
                         card,
-                        34.0,
+                        if self.compact { 44.0 } else { 34.0 },
                         false,
                         enabled && (j != 0 || selected > 0),
                     )
@@ -440,7 +462,7 @@ impl Game {
                     }
                 }
             }
-            cy += 36.0;
+            cy += if self.compact { 48.0 } else { 36.0 };
         } else {
             self.draw_general_proposal(g, tq, side, gi, enabled, x, cy, width);
             return;
@@ -530,7 +552,7 @@ impl Game {
                     x + i as f32 * (bw + 6.0),
                     y + 76.0,
                     bw,
-                    32.0,
+                    if self.compact { 44.0 } else { 32.0 },
                     false,
                     enabled && can,
                 )

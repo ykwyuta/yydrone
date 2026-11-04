@@ -160,7 +160,7 @@ impl Game {
         if clicked {
             self.command_general = gi;
             self.command_tab = 0;
-            self.command_detail_tab = 1;
+            self.command_detail_tab = if self.compact { 0 } else { 1 };
             self.cam = (region.x, region.y);
             self.clamp_camera(g);
             self.toggle_command();
@@ -168,7 +168,8 @@ impl Game {
         clicked
     }
     pub(crate) fn draw_command_map(&mut self, g: &mut dyn Gfx, tq: &mut TextQ) {
-        if self.modal_open() {
+        // 地域指定中はカードが地図へのタップを奪わないようにする。
+        if self.modal_open() || matches!(self.mode, Mode::CommandArea(_)) {
             return;
         }
         let Some(side) = self.viewer else { return };
@@ -199,9 +200,9 @@ impl Game {
                     "担当領域 OFF"
                 },
                 sw - 128.0,
-                top + 48.0,
+                top + if self.compact { 58.0 } else { 48.0 },
                 116.0,
-                32.0,
+                if self.compact { 40.0 } else { 32.0 },
                 self.show_regions,
                 true,
             )
@@ -212,7 +213,7 @@ impl Game {
         if !self.show_regions {
             return;
         }
-        let (x, y) = (sw - 252.0, top + 88.0);
+        let (x, y) = (sw - 252.0, top + if self.compact { 104.0 } else { 88.0 });
         let capacity = ((bottom - y - if preview.is_some() { 68.0 } else { 0.0 } - 52.0) / 54.0)
             .floor()
             .max(1.0) as usize;

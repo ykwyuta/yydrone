@@ -714,10 +714,10 @@ async function loadWasm() {
   const url = new URL('./yydrone.wasm', import.meta.url);
   const imports = { env };
   try {
-    const r = await WebAssembly.instantiateStreaming(fetch(url), imports);
+    const r = await WebAssembly.instantiateStreaming(fetch(url, { cache: 'no-cache' }), imports);
     return r.instance.exports;
   } catch {
-    const buf = await (await fetch(url)).arrayBuffer();
+    const buf = await (await fetch(url, { cache: 'no-cache' })).arrayBuffer();
     const r = await WebAssembly.instantiate(buf, imports);
     return r.instance.exports;
   }

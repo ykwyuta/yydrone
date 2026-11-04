@@ -9,13 +9,14 @@ struct NullGfx {
     dimensions: Option<(f32,f32)>,
     saves: usize,
     portrait_cards: usize,
+    texts: Vec<(String,f32,f32,f32,f32)>,
 }
 
 impl Gfx for NullGfx {
     fn size(&self) -> (f32, f32) {
         self.dimensions.unwrap_or((1600.0, 900.0))
     }
-    fn begin(&mut self, _: Col) {}
+    fn begin(&mut self, _: Col) {self.texts.clear();}
     fn set_xform(&mut self, _: f32, _: f32, _: f32, _: f32) {}
     fn tri(&mut self, _: (f32, f32), _: (f32, f32), _: (f32, f32), _: Col) {}
     fn flush(&mut self) {}
@@ -30,7 +31,7 @@ impl Gfx for NullGfx {
     fn update_texture(&mut self, _: u32, _: u32, _: u32, _: u32, _: u32, _: &[u32]) {}
     fn draw_textured(&mut self, _:u32,x0:f32,y0:f32,x1:f32,y1:f32,_:Col,_:bool) {if ((x1-x0)-44.0).abs()<0.1&&((y1-y0)-44.0).abs()<0.1 {self.portrait_cards+=1;}}
     fn text_begin(&mut self) {}
-    fn text(&mut self, _: &str, _: f32, _: f32, _: f32, _: f32, _: Font, _: Col) {}
+    fn text(&mut self, s:&str,x:f32,y:f32,w:f32,h:f32,_:Font,_:Col) {self.texts.push((s.into(),x,y,w,h));}
     fn text_end(&mut self) {}
     fn measure(&mut self, _: &str, _: Font) -> f32 {
         10.0
@@ -344,6 +345,45 @@ fn disabled_controls_do_not_execute_headquarters_actions() {
     let (mut game,mut gfx)=game();let mut text=crate::ui::TextQ::default();
     game.pressed=Some((0,25.0,25.0));
     assert!(game.button(&mut gfx,&mut text,"disabled",10.0,10.0,100.0,32.0,false,false).is_none());
+}
+
+#[test]
+fn touch_command_card_opens_orders_and_all_controls_work_at_minimum_phone_size() {
+    use yydrone_core::command::*;
+    fn tap(game:&mut Game,gfx:&mut NullGfx,label:&str) {
+        game.frame(gfx,&[],0.0);
+        let (_,x,y,w,h)=gfx.texts.iter().find(|(s,_,_,_,_)|s==label).unwrap_or_else(||panic!("missing phone button {label}")).clone();
+        let (x,y)=(x+w/2.0,y+h/2.0);
+        game.frame(gfx,&[Ev::Touch(true),Ev::MouseMove(x,y),Ev::Down(0,x,y),Ev::Up(0,x,y)],0.0);
+        game.frame(gfx,&[],0.0);
+    }
+    for dimensions in [(900.0,420.0),(1000.0,480.0)] {
+        for side in 0..2 {
+            let (mut game,mut gfx)=game();game.compact=true;game.touch=true;gfx.dimensions=Some(dimensions);game.viewer=Some(side);
+            game.world.as_mut().unwrap().fund_general(side,0,100.0).unwrap();
+            game.command_detail_tab=2;
+            tap(&mut game,&mut gfx,&format!("1 {}",GENERAL_NAMES[side as usize][0]));
+            assert!(game.show_command);assert_eq!(game.command_detail_tab,0,"phone card must open orders directly");
+            for (label,doctrine) in [("全力防御",Doctrine::Defend),("積極攻勢",Doctrine::Assault),("臨機応変",Doctrine::Flexible)] {
+                tap(&mut game,&mut gfx,label);
+                assert_eq!(game.world.as_ref().unwrap().sides[side as usize].command.generals[0].doctrine,doctrine);
+                assert!(gfx.texts.iter().any(|(s,_,_,_,_)|s.contains(&format!("指示：{label}"))));
+            }
+            tap(&mut game,&mut gfx,"予算 +100");
+            assert_eq!(game.world.as_ref().unwrap().sides[side as usize].command.generals[0].budget,200.0);
+            tap(&mut game,&mut gfx,"地域と部隊");
+            for (_,x,y,w,h) in &gfx.texts {assert!(*x>=0.0&&*y>=0.0&&*x+*w<=dimensions.0+1.0&&*y+*h<=dimensions.1,"phone control outside screen");}
+            tap(&mut game,&mut gfx,"地図で中心を指定");assert!(!game.show_command);
+            let (x,y)=(dimensions.0*0.45,dimensions.1*0.6);let expected=game.screen_to_world(&gfx,x,y);
+            game.frame(&mut gfx,&[Ev::Down(0,x,y),Ev::Up(0,x,y)],0.0);
+            assert!(game.show_command);
+            let r=game.world.as_ref().unwrap().sides[side as usize].command.generals[0].region;
+            assert!((r.x-expected.0).abs()<0.01&&(r.y-expected.1).abs()<0.01);
+            let id=game.world.as_ref().unwrap().units.iter().find(|u|u.side==side&&u.kind==UK::Infantry).unwrap().id;
+            game.selected=vec![id];tap(&mut game,&mut gfx,"選択 1 部隊を委任");
+            assert_eq!(game.world.as_ref().unwrap().general_for(side,id),Some(0));
+        }
+    }
 }
 
 #[test]
