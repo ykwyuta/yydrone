@@ -70,7 +70,8 @@ try {
       await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:2,mobile:true});
       await send('Page.navigate',{url:origin+'/?touch=1'});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'mobile WASM');
       if(width===667){await tapText('A＋');await tapText('A＋');}
-      await tapText('作戦開始（2時間）');await tapText('作戦開始');await tapText('司令部');
+      await tapText('作戦開始（2時間）');await tapText('作戦開始');await tapText('生産');
+      const entry=await evaluate(`window.__commandTexts.find(t=>t.text==='司令部')`);const canvasHeight=await evaluate(`document.getElementById('ui').height`);if(!entry||entry.y>canvasHeight*0.12)throw new Error('Headquarters entry is missing from the phone top bar');await tapText('司令部');
       await waitFor(has('司令部 —'),'touch headquarters');await tapText('全力防御');await waitFor(has('指示：全力防御'),'visible doctrine confirmation');await tapText('予算 +100');await waitFor(has('予算 100'),'touch budget');
       await tapText('閉じる');await waitFor(has('全力防御 /'),'touch doctrine applied');await screenshot('touch-'+width);
       await tapText('1 ヴェレス');await tapText('積極攻勢');await waitFor(has('指示：積極攻勢'),'portrait card opens orders');await tapText('地域と部隊');const oldRegion=await evaluate(`window.__commandTexts.find(t=>t.text.startsWith('担当地域：'))?.text`);await tapText('地図で中心を指定');

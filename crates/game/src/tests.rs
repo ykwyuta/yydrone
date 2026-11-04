@@ -348,6 +348,29 @@ fn disabled_controls_do_not_execute_headquarters_actions() {
 }
 
 #[test]
+fn phone_top_bar_opens_headquarters_with_no_generals_and_while_producing_or_selecting() {
+    for dimensions in [(900.0,420.0),(1000.0,480.0)] {
+        for production in [false,true] {
+            for selection in [false,true] {
+                let (mut game,mut gfx)=game();game.compact=true;game.touch=true;gfx.dimensions=Some(dimensions);
+                game.show_prod=production;game.command_tab=1;game.command_detail_tab=2;
+                if selection {game.selected.push(game.world.as_ref().unwrap().units.iter().find(|u|u.side==0).unwrap().id);}
+                game.frame(&mut gfx,&[],0.0);
+                let (_,x,y,w,h)=gfx.texts.iter().find(|(s,_,y,_,_)|s=="司令部"&&*y<game.top_h()).expect("phone needs a permanent headquarters entry").clone();
+                assert!(x>=0.0&&x+w<=dimensions.0&&y+h<=game.top_h());
+                let (x,y)=(x+w/2.0,y+h/2.0);
+                game.frame(&mut gfx,&[Ev::Down(0,x,y),Ev::Up(0,x,y)],0.0);
+                assert!(game.show_command,"top-bar tap did not open headquarters");
+                assert_eq!(game.command_tab,0);assert_eq!(game.command_detail_tab,0);
+                game.frame(&mut gfx,&[],0.0);
+                assert!(gfx.texts.iter().any(|(s,_,_,_,_)|s=="積極攻勢"));
+                assert!(gfx.texts.iter().any(|(s,_,_,_,_)|s=="全力防御"));
+            }
+        }
+    }
+}
+
+#[test]
 fn touch_command_card_opens_orders_and_all_controls_work_at_minimum_phone_size() {
     use yydrone_core::command::*;
     fn tap(game:&mut Game,gfx:&mut NullGfx,label:&str) {

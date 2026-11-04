@@ -264,13 +264,18 @@ impl Game {
             self.speed = if self.speed >= 8 { 1 } else { self.speed * 2 };
         }
         x += 53.0;
-        for (s, a) in [("年表", 0), ("記録", 1), ("？", 2)] {
-            let on = [self.show_chron, self.show_save, self.show_help][a];
+        for (s, a) in [("司令部", 3), ("年表", 0), ("記録", 1), ("？", 2)] {
+            let on = match a {0=>self.show_chron,1=>self.show_save,2=>self.show_help,_=>self.show_command};
             if self.button(g, tq, s, x, 3.0, 54.0, H - 6.0, on, true).is_some() {
                 match a {
                     0 => self.show_chron = !self.show_chron,
                     1 => self.show_save = !self.show_save,
-                    _ => self.show_help = !self.show_help,
+                    2 => self.show_help = !self.show_help,
+                    _ => {
+                        self.toggle_command();
+                        self.command_tab=0;
+                        self.command_detail_tab=0;
+                    }
                 }
             }
             x += 57.0;

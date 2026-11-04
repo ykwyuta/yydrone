@@ -388,6 +388,7 @@ impl Game {
             {
                 self.show_command = false;
                 self.mode = Mode::CommandArea(gi as u8);
+                self.show_prod = false;
             }
             for (j, radius) in [28.0, 42.0, 64.0].into_iter().enumerate() {
                 if self
