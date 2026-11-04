@@ -7,7 +7,7 @@ use super::*;
 use crate::ai::Plan;
 
 const MAGIC: &[u8; 4] = b"YYDR";
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 5;
 
 struct Writer(Vec<u8>);
 
@@ -440,6 +440,31 @@ impl World {
             w.f32(s.1);
             w.f32(s.2);
         }
+        for side in &self.sides {
+            let c=&side.command;
+            w.u32(crate::command::GENERAL_COUNT as u32);
+            for g in &c.generals {
+                w.u8(g.doctrine as u8);w.pair((g.region.x,g.region.y));w.f32(g.region.radius);
+                w.f32(g.budget);w.f32(g.spent);w.u32(g.losses);w.f32(g.buy_t);
+                w.u32(g.units.len() as u32);for id in &g.units{w.u32(*id);}
+            }
+            w.u32(c.pending.len() as u32);for p in &c.pending{w.u32(p.building);w.u32(p.slot as u32);w.u8(p.general);}
+            w.f32(c.report_t);
+            for values in [c.front_losses,c.front_kills,c.last_losses,c.last_kills]{for v in values{w.u32(v);}}
+            w.u32(c.reports.len() as u32);for report in &c.reports{w.f32(report.at);w.u8(report.sector as u8);w.u32(report.text.len() as u32);w.0.extend_from_slice(report.text.as_bytes());}
+        }
+        // 形式4までの本体に続けて、将軍の提案と明示的な地域割当を保存。
+        for side in &self.sides {
+            let c=&side.command;w.f32(c.proposal_t);
+            for (gi,p) in c.proposals.iter().enumerate() {
+                w.bool(c.generals[gi].region_assigned);w.f32(c.proposal_after[gi]);w.bool(p.is_some());
+                if let Some(p)=p {
+                    w.f32(p.at);w.u32(p.city as u32);w.bool(p.region.is_some());
+                    if let Some(r)=p.region {w.pair((r.x,r.y));w.f32(r.radius);}
+                    w.f32(p.budget);w.u32(p.reason.len() as u32);w.0.extend_from_slice(p.reason.as_bytes());
+                }
+            }
+        }
         w.0
     }
 
@@ -449,7 +474,7 @@ impl World {
             return Err("ドローン戦線の記録ではない".into());
         }
         let ver = r.u32()?;
-        if ver != SAVE_VERSION {
+        if ver != SAVE_VERSION && ver != 4 && ver != 3 {
             return Err(format!("記録の版が違う（記録 {ver} ／ このゲーム {SAVE_VERSION}）"));
         }
         let t = r.f32()?;
@@ -718,6 +743,58 @@ impl World {
         for _ in 0..r.usize()? {
             w.scar_log.push((r.f32()?, r.f32()?, r.f32()?));
         }
+        if ver>=4 {
+            use crate::command::*;
+            for side in 0..2usize {
+                let mut c=CommandState::default();let mut assigned=Vec::new();
+                if r.usize()?!=GENERAL_COUNT{return Err(BAD.into());}
+                for g in &mut c.generals {
+                    g.doctrine=match r.u8()?{0=>Doctrine::Assault,1=>Doctrine::Defend,2=>Doctrine::Flexible,_=>return Err(BAD.into())};
+                    let (x,y)=r.pair()?;let radius=r.f32()?;
+                    if x<0.0||x>=W as f32||y<0.0||y>=H as f32||!(4.0..=160.0).contains(&radius){return Err(BAD.into());}
+                    g.region=Region{x,y,radius};g.budget=r.f32()?;g.spent=r.f32()?;g.losses=r.u32()?;g.buy_t=r.f32()?;
+                    if g.budget<0.0||g.spent<0.0{return Err(BAD.into());}
+                    let count=r.usize()?;if count>w.units.len(){return Err(BAD.into());}
+                    for _ in 0..count {let id=r.u32()?;if assigned.contains(&id)||!w.units.iter().any(|u|u.id==id&&u.side as usize==side&&u.auto){return Err(BAD.into());}g.units.push(id);assigned.push(id);}
+                }
+                let count=r.usize()?;if count>w.blds.iter().map(|b|b.queue.len()).sum(){return Err(BAD.into());}
+                for _ in 0..count {
+                    let building=r.u32()?;let slot=r.usize()?;let general=r.u8()?;
+                    if general>DIRECT_COMMAND||!w.blds.iter().any(|b|b.id==building&&b.side as usize==side&&slot<b.queue.len())||c.pending.iter().any(|p|p.building==building&&p.slot==slot){return Err(BAD.into());}
+                    c.pending.push(PendingRecruit{building,slot,general});
+                }
+                c.report_t=r.f32()?;
+                for values in [&mut c.front_losses,&mut c.front_kills,&mut c.last_losses,&mut c.last_kills]{for v in values{*v=r.u32()?;}}
+                let count=r.usize()?;if count>18{return Err(BAD.into());}
+                for _ in 0..count {let at=r.f32()?;let sector=r.u8()? as usize;let len=r.usize()?;if sector>=3||len>4096{return Err(BAD.into());}let text=String::from_utf8(r.take(len)?.to_vec()).map_err(|_|BAD)?;c.reports.push_back(FrontReport{at,sector,text});}
+                w.sides[side].command=c;
+            }
+        }
+        if ver>=5 {
+            use crate::command::*;
+            for side in 0..2 {
+                let c=&mut w.sides[side].command;c.proposal_t=r.f32()?;
+                if !(0.0..=90.0).contains(&c.proposal_t){return Err(BAD.into());}
+                for gi in 0..GENERAL_COUNT {
+                    c.generals[gi].region_assigned=r.bool()?;c.proposal_after[gi]=r.f32()?;
+                    if c.proposal_after[gi]<0.0{return Err(BAD.into());}
+                    if r.bool()? {
+                        let at=r.f32()?;let city=r.usize()?;
+                        if at<0.0||city>=w.map.cities.len(){return Err(BAD.into());}
+                        let region=if r.bool()? {
+                            let (x,y)=r.pair()?;let radius=r.f32()?;
+                            if x<0.0||x>=W as f32||y<0.0||y>=H as f32||!(4.0..=160.0).contains(&radius){return Err(BAD.into());}
+                            Some(Region{x,y,radius})
+                        }else{None};
+                        let budget=r.f32()?;let len=r.usize()?;
+                        if budget<0.0||len>4096{return Err(BAD.into());}
+                        let reason=String::from_utf8(r.take(len)?.to_vec()).map_err(|_|BAD)?;
+                        c.proposals[gi]=Some(GeneralProposal{at,city,region,budget,reason});
+                    }
+                }
+            }
+        }
+        if r.p!=data.len(){return Err(BAD.into());}
         w.total_tiles = w.owner.iter().filter(|o| **o >= 0).count() as u32;
         w.count_tiles();
         w.notices.clear();

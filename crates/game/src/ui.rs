@@ -131,7 +131,8 @@ impl Game {
         g.rect(x, y, x + w, y + h, fill);
         g.rect_outline(x, y, x + w, y + h, 1.0, if on { ACCENT } else { LINE });
         tq.add(s, x, y, w, h, Font::NormalCenter, if enabled { TEXT } else { DIM });
-        self.take_click(x, y, x + w, y + h)
+        let clicked=self.take_click(x, y, x + w, y + h);
+        if enabled {clicked}else{None}
     }
 
     // ------------------------------------------------------------ タイトル
@@ -222,10 +223,11 @@ impl Game {
             }
         }
         y += 52.0;
-        if self.button(g, &mut tq, "作戦開始", cx - 170.0, y, 340.0, 50.0, true, true).is_some() {
+        if self.button(g, &mut tq, "作戦開始", cx - 170.0, y, 166.0, 50.0, true, true).is_some() {
             self.start_game(g);
             return;
         }
+        if self.button(g, &mut tq, "チュートリアル", cx + 4.0, y, 166.0, 50.0, false, true).is_some() { self.start_tutorial(g); return; }
         y += 60.0;
         if self.button(g, &mut tq, "続きから", cx - 170.0, y, 166.0, 34.0, false, true).is_some() {
             self.show_save = true;
@@ -241,7 +243,7 @@ impl Game {
         if self.show_save {
             tq.0.clear();
             self.pressed = press;
-            self.draw_save(g, &mut tq, sw, sh);
+            if self.tutorial.is_some() { self.draw_training_save_notice(g, &mut tq, sw, sh); } else { self.draw_save(g, &mut tq, sw, sh); }
         }
         tq.flush(g);
     }
@@ -332,8 +334,10 @@ impl Game {
             self.draw_bottom(g, &mut tq, sw, sh);
         }
         self.draw_ticker(g, &mut tq);
-        self.draw_mode_hint(g, &mut tq, sw, sh);
+        if !self.modal_open(){self.command_launcher(g,&mut tq,sw);}
+        if self.tutorial.is_none() { self.draw_mode_hint(g, &mut tq, sw, sh); }
         self.draw_banner(g, &mut tq, sw);
+        self.draw_command_map(g,&mut tq);
         if self.modal_open() {
             tq.0.clear();
             self.pressed = modal_press;
@@ -343,7 +347,7 @@ impl Game {
         if self.show_brief {
             self.draw_brief(g, &mut tq, sw, sh);
         } else if self.show_save {
-            self.draw_save(g, &mut tq, sw, sh);
+            if self.tutorial.is_some() { self.draw_training_save_notice(g, &mut tq, sw, sh); } else { self.draw_save(g, &mut tq, sw, sh); }
         } else if self.show_help {
             if self.help_scrolls(g) {
                 self.draw_help_scrolled(g, &mut tq, sw, sh);
@@ -352,6 +356,8 @@ impl Game {
             }
         } else if self.show_chron {
             self.draw_chronicle(g, &mut tq, sw, sh);
+        } else if self.show_command {
+            self.draw_command(g,&mut tq,sw,sh);
         }
         if self.modal_open() {
             self.close_button_draw(g, &mut tq);
@@ -401,6 +407,7 @@ impl Game {
             }
         }
         self.draw_tip(g, &mut tq, sw, sh);
+        self.draw_tutorial(g, &mut tq);
         tq.flush(g);
     }
 
@@ -623,6 +630,7 @@ impl Game {
         let (tt, ot) = (self.terrain_tex, self.overlay_tex);
         g.draw_textured(tt, x0, y0, x1, y1, [0.85, 0.85, 0.85, 1.0], true);
         g.draw_textured(ot, x0, y0, x1, y1, [1.0; 4], true);
+        self.draw_general_minimap(g);
         let (kx, ky) = ((x1 - x0) / W as f32, (y1 - y0) / H as f32);
         let Some(w) = self.world.as_ref() else { return };
         for c in &w.map.cities {
@@ -699,7 +707,7 @@ impl Game {
         let name = if single { d.names[side as usize].to_string() } else { format!("{} 部隊を選択中", sel.len()) };
         tq.add(name, x + 10.0, y + 4.0, w0 - 20.0, 26.0, Font::Big, TEXT);
         if single {
-            self.art.draw_unit_sprite(g, first, x + w0 - 36.0, y + 40.0, 52.0, [1.0; 4]);
+            self.art.draw_unit_sprite(g, first, side, x + w0 - 36.0, y + 40.0, 52.0, [1.0; 4]);
             tq.add(format!("耐久 {:.0}/{:.0}{}{}", sel[0].1, d.hp, if sel[0].2 { "　AI委任中" } else { "" }, if !sel[0].3 { "　補給切れ" } else { "" }), x + 10.0, y + 30.0, w0 - 70.0, 22.0, Font::Small, if sel[0].3 { DIM } else { BAD });
             tq.add(d.desc, x + 10.0, y + 50.0, w0 - 70.0, 40.0, Font::Small, DIM);
         } else {
@@ -710,7 +718,7 @@ impl Game {
                 if c == 0 {
                     continue;
                 }
-                if !self.art.draw_unit_sprite(g, k, ix + 12.0, iy + 12.0, 24.0, [1.0; 4]) {
+                if !self.art.draw_unit_sprite(g, k, side, ix + 12.0, iy + 12.0, 24.0, [1.0; 4]) {
                     draw_unit_icon(g, k, ix + 12.0, iy + 12.0, -0.6, 8.0, SIDE_COL[side as usize], self.clock);
                 }
                 tq.add(format!("{c}"), ix + 22.0, iy + 4.0, 24.0, 20.0, Font::Small, TEXT);
@@ -763,7 +771,7 @@ impl Game {
                 g.rect(cx, cy, cx + bw, cy + bh, if hover { [0.2, 0.23, 0.27, 1.0] } else { PANEL2 });
                 g.rect_outline(cx, cy, cx + bw, cy + bh, 1.0, LINE);
                 let col = if afford { SIDE_COL[side as usize] } else { [0.45, 0.47, 0.5, 1.0] };
-                if !self.art.draw_unit_sprite(g, *k, cx + 22.0, cy + 24.0, 32.0, if afford { [1.0, 1.0, 1.0, 1.0] } else { [0.45, 0.47, 0.5, 0.7] }) {
+                if !self.art.draw_unit_sprite(g, *k, side, cx + 22.0, cy + 24.0, 32.0, if afford { [1.0, 1.0, 1.0, 1.0] } else { [0.45, 0.47, 0.5, 0.7] }) {
                     draw_unit_icon(g, *k, cx + 22.0, cy + 26.0, -0.5, 14.0, col, self.clock);
                 }
                 tq.add(d.short, cx + 42.0, cy + 6.0, bw - 44.0, 20.0, Font::Normal, if afford { TEXT } else { DIM });
@@ -903,6 +911,7 @@ impl Game {
             Mode::Job(JobKind::Teeth) => "竜の歯（車両止め）をドラッグで引く".into(),
             Mode::Job(JobKind::Pontoon) => "川の上をドラッグして浮橋を架ける".into(),
             Mode::Rally => "集結地点をタップ".into(),
+            Mode::CommandArea(_) => "将軍の担当地域の中心を地図上で指定（右クリックで中止）".into(),
         };
         // タッチ向けの言い方に直す
         let s = if self.touch { s.replace("をクリック", "をタップ").replace("（右クリックで中止）", "").replace("ドラッグ", "なぞって") } else { s };
@@ -975,10 +984,11 @@ impl Game {
         let col = if c.side > 1 { TEXT } else { SIDE_COL[c.side as usize] };
         // 通知の右に出す
         let left = if self.compact { 316.0 } else { 486.0 };
-        let bw = 640.0f32.min(sw - left - 8.0);
-        let (x, y) = ((sw / 2.0 - bw / 2.0).max(left), self.top_h() + 40.0);
-        self.bg_rects.push((x, y, x + bw, y + 80.0));
+        let right=if self.show_regions && self.viewer.is_some(){sw-264.0}else{sw};
+        let bw = 640.0f32.min(right - left - 8.0);
+        let (x, y) = ((right / 2.0 - bw / 2.0).max(left), self.top_h() + 40.0);
         let h = 34.0 + g.measure_h(c.text, Font::Normal, bw - 28.0);
+        self.bg_rects.push((x, y, x + bw, y + h + 8.0));
         g.rect(x, y, x + bw, y + h + 8.0, [0.03, 0.04, 0.05, 0.9 * a]);
         g.rect(x, y, x + 5.0, y + h + 8.0, [col[0], col[1], col[2], a]);
         tq.add(format!("{}　{}", c.date, c.title), x + 16.0, y + 5.0, bw - 28.0, 28.0, Font::Big, [ACCENT[0], ACCENT[1], ACCENT[2], a]);

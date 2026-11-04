@@ -1,0 +1,254 @@
+[
+  {
+    "id": "adviser_01",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_01.png",
+    "original": "assets/command/sources/general_ua_0.png",
+    "original_sha256": "ba2a7d80532ee72a0b177400b452bb729ec8ce62b537503f72aed546be59e387",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ua_0"
+  },
+  {
+    "id": "adviser_02",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_02.png",
+    "original": "assets/command/sources/general_ua_1.png",
+    "original_sha256": "a989c75a4d8849f0b4fcc177cc7ecdb7142de9b86cd7a5a28166062d9e63d5cc",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ua_1"
+  },
+  {
+    "id": "adviser_03",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_03.png",
+    "original": "assets/command/sources/general_ua_2.png",
+    "original_sha256": "ef53b4cfb86c91f5bcf82410e62f9f9de651bdb2960bdd840a41647835b9040e",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ua_2"
+  },
+  {
+    "id": "adviser_04",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_04.png",
+    "original": "assets/command/sources/general_ru_0.png",
+    "original_sha256": "3f965a7aeb731e91dc54eb7642b863367aa4fc8f0075328c6a6f9bc1653460f2",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ru_0"
+  },
+  {
+    "id": "adviser_05",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_05.png",
+    "original": "assets/command/sources/general_ru_1.png",
+    "original_sha256": "997b2fd396119824995d29a26611ed216037e6cd2a8a997ae8c947b152545dfd",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ru_1"
+  },
+  {
+    "id": "adviser_06",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_06.png",
+    "original": "assets/command/sources/general_ru_2.png",
+    "original_sha256": "865f87116b114ba30e08e853970247186bc1573383710cdc6969c47e7cfe97fd",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/general_ru_2"
+  },
+  {
+    "id": "adviser_07",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_07.png",
+    "original": "assets/command/sources/staff_ua.png",
+    "original_sha256": "343cc9ccd3d04b5773c2a164fb51d52adde3284688ec71bfc36bbcb776945ccd",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/staff_ua"
+  },
+  {
+    "id": "adviser_08",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_08.png",
+    "original": "assets/command/sources/staff_ru.png",
+    "original_sha256": "7775fd8aed1cd97e108e5e1e6fbd230287d2a8a0d15c8192d8cbf622166a31a8",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources/staff_ru"
+  },
+  {
+    "id": "adviser_09",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_09.png",
+    "original": "assets/command/sources-v2/general_ua_0.png",
+    "original_sha256": "e2b6c7cc513ac65f9f825fb83cf6ccabab91765e01ca5bd12b0b00f4d3080e0d",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_0"
+  },
+  {
+    "id": "adviser_10",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_10.png",
+    "original": "assets/command/sources-v2/general_ua_1.png",
+    "original_sha256": "c00ce7a25f858420e35c47ddb4169095fbe32a15cd59a544c2b3c4fa89fccec9",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_1"
+  },
+  {
+    "id": "adviser_11",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_11.png",
+    "original": "assets/command/sources-v2/general_ua_2.png",
+    "original_sha256": "37afb4d950cada731223f0b5f32e0a4e1a4b4c204924cb12a3fd503682cd4521",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_2"
+  },
+  {
+    "id": "adviser_12",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_12.png",
+    "original": "assets/command/sources-v2/general_ru_0.png",
+    "original_sha256": "fd927cfee0095769820c1ed7f7cd8d70074c642ff1b0b2f97a3a9f2b669d1776",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_0"
+  },
+  {
+    "id": "adviser_13",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_13.png",
+    "original": "assets/command/sources-v2/general_ru_1.png",
+    "original_sha256": "5eb6aeba2ef210b712ce8ab2e774b2d4c3909520941ff71b5489c49dce580563",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_1"
+  },
+  {
+    "id": "adviser_14",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_14.png",
+    "original": "assets/command/sources-v2/general_ru_2.png",
+    "original_sha256": "491bfbe918b074258c5aa2ddad732c46b067ac5ca8e8fd0aa2b8efb5eab90144",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_2"
+  },
+  {
+    "id": "adviser_15",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_15.png",
+    "original": "assets/command/sources-v2/staff_ua.png",
+    "original_sha256": "2e3c7c178d1fd090c826ca6dc2bb2ea78f2da133c27465b8fef4111d82b105fe",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/staff_ua"
+  },
+  {
+    "id": "adviser_16",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_16.png",
+    "original": "assets/command/sources-v2/staff_ru.png",
+    "original_sha256": "cf39ac18868765fa65046733218b170fbaa3d0be64218096dfe559499fbb603d",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/staff_ru"
+  },
+  {
+    "id": "adviser_17",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_17.png",
+    "original": "assets/command/sources-v2/general_ua_3.png",
+    "original_sha256": "7f6576bbdd98868fb1b9c894f625d3741fb7180d86cf1fc7ea7687e778b7a3b0",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_3"
+  },
+  {
+    "id": "adviser_18",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_18.png",
+    "original": "assets/command/sources-v2/general_ua_4.png",
+    "original_sha256": "f1016e2de28e0d9cd0b853250d5746376c857d72edbade58403219a75240064a",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_4"
+  },
+  {
+    "id": "adviser_19",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_19.png",
+    "original": "assets/command/sources-v2/general_ua_5.png",
+    "original_sha256": "d4da0ac90228cc403cdef2ddc65413e1b8230131c771f3a9eeb923c8f8047871",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_5"
+  },
+  {
+    "id": "adviser_20",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_20.png",
+    "original": "assets/command/sources-v2/general_ua_6.png",
+    "original_sha256": "469b4c1b5ac2ddc495e23c44f299af2a715a5774cd82a63f665dbb59a75c788a",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_6"
+  },
+  {
+    "id": "adviser_21",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_21.png",
+    "original": "assets/command/sources-v2/general_ua_7.png",
+    "original_sha256": "4e09924bf8297f1326540de40c6e82038e41d6e679db483f5c81f8bcfc8a5842",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_7"
+  },
+  {
+    "id": "adviser_22",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_22.png",
+    "original": "assets/command/sources-v2/general_ua_8.png",
+    "original_sha256": "22c4d715ecc47a0062fcfcb5c50e25a75c8bbda3131df9d2d7cf38ff16c91ff1",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ua_8"
+  },
+  {
+    "id": "adviser_23",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_23.png",
+    "original": "assets/command/sources-v2/general_ru_3.png",
+    "original_sha256": "f2b2c3be13f8f0fd59d47e9b14f905bfb24a64cfef3fcc1246582999216043a5",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_3"
+  },
+  {
+    "id": "adviser_24",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_24.png",
+    "original": "assets/command/sources-v2/general_ru_4.png",
+    "original_sha256": "ae11085ca2ff6da2b0fd55da4edc0af0b3802b25842b6d89283b00a95bd5d0a6",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_4"
+  },
+  {
+    "id": "adviser_25",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_25.png",
+    "original": "assets/command/sources-v2/general_ru_5.png",
+    "original_sha256": "dedc9452b140c5c284aa2e35c08a521ce52abf0f795c17fc399bdd668b283bda",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_5"
+  },
+  {
+    "id": "adviser_26",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_26.png",
+    "original": "assets/command/sources-v2/general_ru_6.png",
+    "original_sha256": "2d072e3c7c5bb6fb63cc5e13304364b1845a4da24d7e9c12cc3f223d79cca7c0",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_6"
+  },
+  {
+    "id": "adviser_27",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_27.png",
+    "original": "assets/command/sources-v2/general_ru_7.png",
+    "original_sha256": "99aa621f1857bd99dbe3477f8195b51967f2a1b543cd276a3ea4f1de48d39d11",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_7"
+  },
+  {
+    "id": "adviser_28",
+    "role": "軍事顧問候補（将来用・現在の将軍名簿には未登録）",
+    "portrait": "assets/command/advisers/adviser_28.png",
+    "original": "assets/command/sources-v2/general_ru_8.png",
+    "original_sha256": "35b722bca527c55a4b03a673ac6e58a4cf541d2034de96c9df1f434a21c59f66",
+    "prompt_manifest": "docs/command-adviser-prompts.json",
+    "prompt_id": "sources-v2/general_ru_8"
+  }
+]

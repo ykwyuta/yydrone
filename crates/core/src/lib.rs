@@ -4,6 +4,7 @@
 //! WebAssembly にコンパイルして組み込む。乱数の種が同じなら同じ展開になる。
 
 pub mod ai;
+pub mod command;
 pub mod defs;
 pub mod geo;
 pub mod history;
@@ -13,3 +14,5 @@ pub mod world;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod command_tests;

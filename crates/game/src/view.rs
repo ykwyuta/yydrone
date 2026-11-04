@@ -75,11 +75,20 @@ pub fn draw_unit_icon(g: &mut dyn Gfx, k: UK, x: f32, y: f32, ang: f32, s: f32, 
             g.poly(x, y, ang, s * 0.6, &HULL, c);
             barrel(g, 1.25, 0.1, DARK, 0.1);
         }
-        UK::Mlrs | UK::Coastal => {
+        UK::Mlrs => {
             g.poly(x, y, ang, s * 1.1, &TRUCK, DARK);
             g.poly(x, y, ang, s, &TRUCK, lo);
             for o in [-0.14f32, 0.0, 0.14] {
-                g.line(at(-0.55, o), at(0.2, o), 0.1 * s, if k == UK::Coastal { [0.86, 0.9, 1.0, 1.0] } else { hi });
+                g.line(at(-0.55, o), at(0.2, o), 0.1 * s, hi);
+            }
+        }
+        UK::Coastal => {
+            g.poly(x, y, ang, s * 1.1, &TRUCK, DARK);
+            g.poly(x, y, ang, s, &TRUCK, lo);
+            // 遠景でも、大型の対艦発射筒を小型ロケットの束と区別する。
+            for o in [-0.15f32, 0.15] {
+                g.line(at(-0.65, o), at(0.35, o), 0.22 * s, hi);
+                g.line(at(0.35, o - 0.1), at(0.35, o + 0.1), 0.07 * s, DARK);
             }
         }
         UK::Shorad => {
@@ -291,6 +300,7 @@ impl Game {
         let viewer = self.viewer;
         let t = self.anim;
         // 地雷（自軍のものだけ見える）と橋
+        self.draw_general_regions(g);
         if z >= 5.0 {
             let (xa, xb) = ((x0.max(0.0)) as usize, (x1.min(W as f32 - 1.0)) as usize);
             let (ya, yb) = ((y0.max(0.0)) as usize, (y1.min(H as f32 - 1.0)) as usize);
@@ -423,9 +433,9 @@ impl Game {
                     g.ring(u.x, u.y, s * 0.95, s * 0.1, 10, [0.32, 0.23, 0.13, 0.85]);
                 }
                 let drawn_sprite = if z >= 3.5 {
-                    if let Some(tex) = self.art.unit_texture(g, u.kind) {
+                    if let Some(tex) = self.art.unit_texture(g, u.kind, u.side) {
                         let sz = s * 2.4;
-                        // 絵は両軍共通なので、足元の円と外周の輪で陣営を示す
+                        // 陣営別の型式画像に加え、足元の円と外周の輪で所属を示す
                         g.circle(u.x, u.y, s * 1.2, 16, [c[0], c[1], c[2], 0.4]);
                         g.draw_textured(tex, u.x - sz * 0.5, u.y - sz * 0.5, u.x + sz * 0.5, u.y + sz * 0.5, [1.0, 1.0, 1.0, 1.0], true);
                         g.ring(u.x, u.y, s * 1.2, s * 0.13, 16, c);

@@ -8,6 +8,8 @@ use crate::rng::Rng;
 use std::collections::VecDeque;
 
 mod save;
+mod training;
+pub use training::{TrainingLesson,TrainingActors,TRAINING_LESSONS,TRAINING_TASKS};
 pub use save::SAVE_VERSION;
 
 /// 部隊 1 つあたりの維持費（資金／秒）
@@ -233,6 +235,7 @@ pub struct SideState {
     /// 生産と建設も AI に任せる
     pub auto_buy: bool,
     pub plan: crate::ai::Plan,
+    pub command: crate::command::CommandState,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -254,6 +257,8 @@ pub struct Settings {
 }
 
 pub struct World {
+    training: bool,
+    pub training_fpv_launches: u32,
     pub map: Map,
     pub owner: Vec<i8>,
     pub cap: Vec<i16>,
@@ -339,12 +344,15 @@ impl World {
             auto_new: true,
             auto_buy: false,
             plan: Default::default(),
+            command: Default::default(),
         };
         let ai0 = s.player != Some(0);
         let ai1 = s.player != Some(1);
         let m0 = if ai0 && s.player.is_some() { s.ai_mult } else { 1.0 };
         let m1 = if ai1 && s.player.is_some() { s.ai_mult } else { 1.0 };
         let mut w = World {
+            training: false,
+            training_fpv_launches: 0,
             map,
             owner,
             cap: vec![0; n],
@@ -801,6 +809,7 @@ impl World {
     // ------------------------------------------------------------ 部隊の追加と検索
 
     pub fn spawn(&mut self, k: UK, side: u8, x: f32, y: f32) -> u32 {
+        if self.training&&Some(side)==self.player&&k==UK::Fpv{self.training_fpv_launches+=1;}
         let d = def(k);
         let id = self.id_map.len() as u32;
         self.id_map.push(self.units.len() as u32);
@@ -973,7 +982,10 @@ impl World {
                     u.jobs.clear();
                 }
             }
-            Cmd::Auto(a) => self.units[i].auto = a,
+            Cmd::Auto(a) => {
+                self.units[i].auto = a;
+                if !a {let s=self.units[i].side as usize;for g in &mut self.sides[s].command.generals {g.units.retain(|u|*u!=id);}}
+            },
         }
     }
 
@@ -1076,17 +1088,12 @@ impl World {
 
     /// 予約を1つ取り消して資金を返す
     pub fn cancel_unit(&mut self, side: u8, k: UK) -> bool {
-        for b in self.blds.iter_mut().filter(|b| b.side == side) {
-            if let Some(p) = b.queue.iter().rposition(|q| *q == k) {
-                b.queue.remove(p);
-                if p == 0 {
-                    b.prog = 0.0;
-                }
-                self.sides[side as usize].funds += unit_cost(side, k);
-                return true;
-            }
-        }
-        false
+        let entry=self.blds.iter().enumerate().filter(|(_,b)|b.side==side).find_map(|(i,b)|b.queue.iter().rposition(|q|*q==k).map(|p|(i,b.id,p)));
+        let Some((i,id,p))=entry else{return false};
+        self.blds[i].queue.remove(p);if p==0{self.blds[i].prog=0.0;}
+        let cost=unit_cost(side,k);
+        if !self.cancel_command_recruit(side,id,p,cost){self.sides[side as usize].funds+=cost;}
+        true
     }
 
     /// 建物をこの場所に置けるか（理由つき）
@@ -1202,20 +1209,24 @@ impl World {
             self.update_buildings(0.5);
         }
         if tk % 20 == 0 {
-            self.update_season();
-            self.update_weather(1.0);
-            self.repair_rails();
-            self.economy(1.0);
-            self.run_history();
-            for s in 0..2u8 {
-                self.ai_tick(s);
+            if self.training {
+                self.command_tick(self.player.unwrap_or(0));
+            } else {
+                self.update_season();
+                self.update_weather(1.0);
+                self.repair_rails();
+                self.economy(1.0);
+                self.run_history();
+                for s in 0..2u8 {
+                    self.ai_tick(s);
+                }
             }
         }
         if tk % 60 == 0 {
             self.update_supply();
             self.pockets();
         }
-        if tk % 400 == 0 {
+        if tk % 400 == 0 && !self.training {
             self.partisans();
         }
         if tk % 100 == 0 {
@@ -1231,7 +1242,7 @@ impl World {
         }
         self.sats.retain(|s| s.3 > 0.0);
         self.cleanup();
-        if self.t >= self.duration {
+        if self.t >= self.duration && !self.training {
             self.over = true;
             self.count_tiles();
             let (a, b) = (self.sides[0].tiles, self.sides[1].tiles);
@@ -1241,11 +1252,14 @@ impl World {
     }
 
     fn cleanup(&mut self) {
-        let side_dead: Vec<(u8, UK)> = self.units.iter().filter(|u| u.dead).map(|u| (u.side, u.kind)).collect();
-        for (s, k) in side_dead {
+        let side_dead: Vec<(u8, UK, u32, f32)> = self.units.iter().filter(|u| u.dead).map(|u| (u.side, u.kind,u.id,u.y)).collect();
+        for (s, k, id, y) in side_dead {
             if !matches!(k, UK::Fpv | UK::Cruise | UK::LongDrone | UK::SeaDrone) {
                 self.sides[s as usize].losses += 1;
+                self.sides[s as usize].command.front_losses[crate::command::sector(y)] += 1;
+                for g in &mut self.sides[s as usize].command.generals {if g.units.contains(&id){g.losses+=1;}}
             }
+            for g in &mut self.sides[s as usize].command.generals {g.units.retain(|u|*u!=id);}
         }
         if self.units.iter().any(|u| u.dead) {
             self.units.retain(|u| !u.dead);
@@ -1255,6 +1269,8 @@ impl World {
         }
         self.projs.retain(|p| !p.done);
         self.blds.retain(|b| !b.dead);
+        let live:Vec<u32>=self.blds.iter().map(|b|b.id).collect();
+        for s in &mut self.sides {s.command.pending.retain(|p|live.contains(&p.building));}
     }
 
     fn rebuild_grid(&mut self) {
@@ -1880,6 +1896,7 @@ impl World {
             self.fx.push(Fx { kind: if air { FxKind::AirBurst } else if big { FxKind::BigBlast } else { FxKind::Blast }, x, y, x2: x, y2: y, side: from, r: if big { 1.6 } else { 0.7 } });
             if !matches!(k, UK::Fpv | UK::Cruise | UK::LongDrone | UK::SeaDrone) {
                 self.sides[from as usize].kills += 1;
+                self.sides[from as usize].command.front_kills[crate::command::sector(y)] += 1;
             }
         }
     }
@@ -2744,7 +2761,7 @@ impl World {
     // ------------------------------------------------------------ 建物と生産
 
     fn update_buildings(&mut self, dt: f32) {
-        let mut spawns: Vec<(UK, u8, f32, f32, Option<(f32, f32)>)> = Vec::new();
+        let mut spawns: Vec<(UK, u8, f32, f32, Option<(f32, f32)>,u32)> = Vec::new();
         for b in &mut self.blds {
             if b.dead {
                 continue;
@@ -2760,13 +2777,18 @@ impl World {
                 if b.prog >= def(k).time {
                     b.prog = 0.0;
                     b.queue.pop_front();
-                    spawns.push((k, b.side, b.x, b.y, b.rally));
+                    spawns.push((k, b.side, b.x, b.y, b.rally,b.id));
                 }
             }
         }
-        for (k, side, x, y, rally) in spawns {
+        for (k, side, x, y, rally, building) in spawns {
             let a = self.rng.range(0.0, std::f32::consts::TAU);
             let id = self.spawn(k, side, x + a.cos() * 2.5, y + a.sin() * 2.5);
+            if let Some(general)=self.finish_command_recruit(side,building) {
+                if general<crate::command::DIRECT_COMMAND {let _=self.assign_general(side,general as usize,&[id]);}
+                else {self.command_one(id,Cmd::Auto(false),0.0,0.0);}
+                continue;
+            }
             if let (Some(r), Some(i)) = (rally, self.unit_index(id)) {
                 // 集結地点を決めた建物の部隊はプレイヤーが直接指揮する
                 self.units[i].auto = self.sides[side as usize].ai;

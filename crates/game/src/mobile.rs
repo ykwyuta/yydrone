@@ -79,6 +79,7 @@ impl Game {
             self.show_help = false;
             self.show_chron = false;
             self.show_save = false;
+            self.show_command = false;
             self.show_brief = false;
         }
     }
@@ -174,10 +175,11 @@ impl Game {
             }
         }
         y += 50.0;
-        if self.button(g, &mut tq, "作戦開始（プレイ時間 2時間）", x0, y, cw * 2.0 + 12.0, 56.0, true, true).is_some() {
+        if self.button(g, &mut tq, "作戦開始（2時間）", x0, y, cw, 56.0, true, true).is_some() {
             self.start_game(g);
             return;
         }
+        if self.button(g, &mut tq, "チュートリアル", x0 + cw + 12.0, y, cw, 56.0, false, true).is_some() { self.start_tutorial(g); return; }
         y += 62.0;
         let sub = ((cw * 2.0 + 12.0 - 12.0) / 4.0).floor();
         if self.button(g, &mut tq, "続きから", x0, y, sub, 48.0, false, true).is_some() {

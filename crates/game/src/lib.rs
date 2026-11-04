@@ -4,6 +4,9 @@ pub mod gfx;
 pub mod art;
 mod mobile;
 mod paint;
+mod command_ui;
+mod tutorial;
+mod command_map;
 pub mod ui;
 mod view;
 
@@ -54,6 +57,7 @@ pub enum Mode {
     Job(JobKind),
     /// 建物の集結地点（タッチ向け）
     Rally,
+    CommandArea(u8),
 }
 
 pub struct Ticker {
@@ -66,6 +70,7 @@ pub struct Ticker {
 pub struct Game {
     pub screen: Screen,
     pub world: Option<World>,
+    pub(crate) tutorial: Option<tutorial::TutorialState>,
     pub viewer: Option<u8>,
     // タイトルの設定
     pub cfg_side: i32,
@@ -105,6 +110,15 @@ pub struct Game {
     pub show_brief: bool,
     pub show_chron: bool,
     pub show_save: bool,
+    pub show_command: bool,
+    pub command_tab: usize,
+    pub command_general: usize,
+    pub command_report_page: usize,
+    pub command_detail_tab: usize,
+    pub command_staff_tab: usize,
+    pub show_regions: bool,
+    pub region_card_page: usize,
+    pub proposal_preview: Option<usize>,
     pub chron_scroll: f32,
     pub compact: bool,
     pub touch: bool,
@@ -145,6 +159,7 @@ impl Game {
         Game {
             screen: Screen::Title,
             world: None,
+            tutorial: None,
             viewer: None,
             cfg_side: 0,
             cfg_diff: 1,
@@ -178,6 +193,15 @@ impl Game {
             show_brief: false,
             show_chron: false,
             show_save: false,
+            show_command: false,
+            command_tab: 0,
+            command_general: 0,
+            command_report_page: 0,
+            command_detail_tab: 0,
+            command_staff_tab: 0,
+            show_regions: true,
+            region_card_page: 0,
+            proposal_preview: None,
             chron_scroll: 0.0,
             compact: false,
             touch: false,
@@ -214,10 +238,15 @@ impl Game {
     }
 
     pub fn start_game(&mut self, g: &mut dyn Gfx) {
+        self.tutorial = None;
         const DIFFS: [f32; 3] = [0.75, 1.0, 1.35];
         let player = if self.cfg_side < 0 { None } else { Some(self.cfg_side as u8) };
         let w = World::new(Settings { duration: WAR_SECONDS, seed: self.seed, ai_mult: DIFFS[self.cfg_diff], player });
         self.seed = self.seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(1);
+        self.begin_world(g, w, player);
+    }
+
+    fn begin_world(&mut self, g: &mut dyn Gfx, w: World, player: Option<u8>) {
         self.viewer = player;
         if self.terrain.is_empty() {
             self.terrain = paint::paint_all(&w);
@@ -234,6 +263,10 @@ impl Game {
         let (sw, _) = g.size();
         self.zoom = (sw / 150.0).max(5.0);
         self.selected.clear();
+        self.last_sel.clear();
+        self.cmd_pause = false;
+        self.drag = None; self.pan = None; self.job_start = None;
+        self.minimap_drag = false;
         self.sel_bld = None;
         self.groups = Default::default();
         self.mode = Mode::Normal;
@@ -255,6 +288,8 @@ impl Game {
         self.chron_seen = 0;
         self.autosave_t = 0.0;
         self.banner.clear();
+        self.show_command=false;self.command_tab=0;self.command_general=0;self.command_report_page=0;
+        self.proposal_preview=None;self.show_regions=true;self.region_card_page=0;
         self.overlay_t = 0.0;
         self.world = Some(w);
         self.screen = Screen::Play;
@@ -311,9 +346,9 @@ impl Game {
     fn advance(&mut self, g: &mut dyn Gfx, dt: f32) {
         self.anim += dt;
         self.update_cmd_pause();
-        let frozen = self.paused || self.modal_open() || self.cmd_hold();
+        let frozen = self.paused || self.modal_open() || self.cmd_hold() || self.tutorial_bookend();
         // 自動記録（2分ごと）
-        if !frozen {
+        if !frozen && self.tutorial.is_none() {
             self.autosave_t += dt;
             if self.autosave_t >= 120.0 {
                 self.autosave_t = 0.0;
@@ -425,6 +460,7 @@ impl Game {
         if over {
             self.screen = Screen::Result;
         }
+        self.update_tutorial();
     }
 
     fn scroll_camera(&mut self, g: &dyn Gfx, dt: f32) {
@@ -598,7 +634,7 @@ impl Game {
     }
 
     pub fn modal_open(&self) -> bool {
-        self.show_help || self.show_brief || self.show_chron || self.show_save
+        self.show_help || self.show_brief || self.show_chron || self.show_save || self.show_command
     }
 
     fn side(&self) -> Option<u8> {
@@ -621,6 +657,7 @@ impl Game {
         match k {
             0x70 => self.show_help = !self.show_help,
             0x71 => self.show_chron = !self.show_chron,
+            0x72 => self.toggle_command(),
             0x74 => self.show_save = !self.show_save,
             0x20 => {
                 if self.show_brief {
@@ -630,7 +667,8 @@ impl Game {
                 }
             }
             0x1B => {
-                if self.show_save {
+                if self.show_command {self.show_command=false;
+                } else if self.show_save {
                     self.show_save = false;
                 } else if self.show_chron {
                     self.show_chron = false;
@@ -871,6 +909,14 @@ impl Game {
         let sel_bld = self.sel_bld;
         let Some(w) = self.world.as_mut() else { return };
         match mode {
+            Mode::CommandArea(index) => {
+                let g=&mut w.sides[side as usize].command.generals[index as usize];
+                g.region.x=wx.clamp(0.5,W as f32-1.0);g.region.y=wy.clamp(0.5,H as f32-1.0);g.region_assigned=true;
+                let assigned=g.units.clone();
+                for id in assigned {w.command_one(id,Cmd::Stop,0.0,0.0);if let Some(i)=w.unit_index(id){w.units[i].ai_t=0.0;}}
+                self.mode=Mode::Normal;self.show_command=true;
+                self.message("将軍の担当地域を設定しました");
+            }
             Mode::Rally => {
                 if let Some(b) = w.blds.iter_mut().find(|b| Some(b.id) == sel_bld) {
                     b.rally = Some((wx, wy));
@@ -954,6 +1000,7 @@ impl Game {
     }
 
     pub fn save_to(&mut self, g: &mut dyn Gfx, slot: u8) {
+        if self.tutorial.is_some() { self.message("訓練中は記録しません。通常作戦のセーブは保護されています。"); return; }
         let meta = self.save_meta();
         if let Some(w) = self.world.as_ref().filter(|w| !w.over) {
             let data = w.save_bytes();
@@ -963,7 +1010,7 @@ impl Game {
 
     /// 中断される前に自動記録する（アプリが裏に回ったときなど）
     pub fn autosave_now(&mut self, g: &mut dyn Gfx) {
-        if self.screen == Screen::Play {
+        if self.screen == Screen::Play && self.tutorial.is_none() {
             self.save_to(g, 0);
         }
     }
@@ -977,6 +1024,7 @@ impl Game {
                 return;
             }
         };
+        self.tutorial = None;
         self.terrain = paint::paint_all(&w);
         for (i, sc) in w.scar_log.iter().enumerate() {
             paint::stamp_scar(&mut self.terrain, sc.0, sc.1, sc.2, i as u32);
@@ -1011,6 +1059,8 @@ impl Game {
         self.show_prod = false;
         self.place_tap = None;
         self.chron_seen = w.chronicle.len();
+        self.show_command=false;self.command_report_page=0;
+        self.proposal_preview=None;self.show_regions=true;self.region_card_page=0;
         self.overlay_t = 0.0;
         self.autosave_t = 0.0;
         let date = w.date_text();

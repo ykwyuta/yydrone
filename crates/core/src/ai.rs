@@ -49,6 +49,7 @@ fn combat_strength(k: UK) -> f32 {
 
 impl World {
     pub fn ai_tick(&mut self, side: u8) {
+        if !self.is_frozen(side) {self.command_tick(side);}
         let s = side as usize;
         let is_ai = self.sides[s].ai;
         let cells = self.scan_cells(side);
@@ -299,7 +300,8 @@ impl World {
         }
         let s = side as usize;
         let axes: Vec<(f32, f32)> = self.sides[s].plan.axes.iter().map(|&c| (self.map.cities[c].x, self.map.cities[c].y)).collect();
-        let ids: Vec<u32> = self.units.iter().filter(|u| u.side == side && u.auto && !u.dead).map(|u| u.id).collect();
+        let delegated:std::collections::HashSet<u32>=self.sides[s].command.generals.iter().flat_map(|g|g.units.iter().copied()).collect();
+        let ids: Vec<u32> = self.units.iter().filter(|u| u.side == side && u.auto && !u.dead && !delegated.contains(&u.id)).map(|u| u.id).collect();
         for id in ids {
             let Some(i) = self.unit_index(id) else { continue };
             let k = self.units[i].kind;

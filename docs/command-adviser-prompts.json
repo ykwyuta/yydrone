@@ -1,0 +1,146 @@
+{
+  "role": "military_adviser_candidates",
+  "tool": "built-in image_gen",
+  "portraits": [
+    {
+      "id": "general_ua_0",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Ukrainian-inspired senior male commander, age 52, close-cropped graying hair, square face, intense determined eyes, olive field jacket, no hat",
+      "series": "sources"
+    },
+    {
+      "id": "general_ua_1",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Ukrainian-inspired female senior commander, age 46, dark brown hair tied back, thoughtful composed face, muted olive field uniform, no hat",
+      "series": "sources"
+    },
+    {
+      "id": "general_ua_2",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Ukrainian-inspired male operational commander, age 41, short dark hair and neatly trimmed beard, attentive calm expression, olive field jacket",
+      "series": "sources"
+    },
+    {
+      "id": "general_ru_0",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Russian-inspired senior male commander, age 55, receding gray hair, broad face, stern determined expression, dark olive field jacket, no hat",
+      "series": "sources"
+    },
+    {
+      "id": "general_ru_1",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Russian-inspired male senior commander, age 59, slim face, gray hair and short gray mustache, cautious analytical expression, muted olive field uniform",
+      "series": "sources"
+    },
+    {
+      "id": "general_ru_2",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Russian-inspired female operational commander, age 44, short auburn hair, alert confident expression, dark olive field jacket",
+      "series": "sources"
+    },
+    {
+      "id": "staff_ua",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Ukrainian-inspired female chief of staff, age 38, short dark hair, thin understated glasses, thoughtful welcoming expression, plain olive staff uniform",
+      "series": "sources"
+    },
+    {
+      "id": "staff_ru",
+      "prompt": "Create one professional hand-painted realistic strategy-game CHARACTER PORTRAIT, square head-and-shoulders bust, consistent series art style, muted olive and slate palette, soft studio light from upper left, quiet dark slate background, clean readable face at 160px. This is an entirely fictional person, not based on any real military leader. Peaceful neutral portrait, no weapons, blood, combat, medals, flags, insignia, rank marks, text, logo, UI or watermark. Centered face with room for shoulders, full head visible. Subject: fictional Russian-inspired male chief of staff, age 43, short brown hair, understated glasses, focused thoughtful expression, plain dark olive staff uniform",
+      "series": "sources"
+    },
+    {
+      "id": "general_ua_0",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 48, long narrow face, curly chestnut hair swept to one side, prominent hooked nose, short pointed reddish beard, hazel eyes, a small notch in left eyebrow, determined expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_1",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 51, round face, short silver pixie haircut, warm brown skin, wide dark eyes, small freckles across cheeks, calm thoughtful smile",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_2",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 39, broad high cheekbones and narrow chin, shoulder-length wavy black hair tied back, clean-shaven, green eyes, distinctive round wire glasses, attentive expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_0",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 49, angular diamond face, dark curly hair in a bun with a silver streak, prominent cheekbones, thick straight eyebrows, strong resolute expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_1",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 57, round wide face, thick wavy salt-and-pepper hair, soft brown eyes, full neat white beard, thin oval glasses, measured kind expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_2",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 42, medium brown skin, oval face, close cropped black curls, broad nose, trimmed mustache, light brown eyes, thoughtful slightly asymmetric smile",
+      "series": "sources-v2"
+    },
+    {
+      "id": "staff_ua",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 36, elongated face, copper-red braided hair over one shoulder, many freckles, hazel eyes, large round dark glasses, composed friendly expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "staff_ru",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 37, narrow face, tousled sandy blond hair, light short beard, large ears, blue eyes, rectangular dark glasses, focused friendly expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_3",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 43, tan skin, tall rectangular face, asymmetrical short black bob, very thick brows, hazel eyes, small dimple in chin, confident energetic expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_4",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 54, light brown skin, narrow triangular face, long silver-gray hair tied low, round nose, thin dark mustache, deep-set amber eyes, thoughtful expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_5",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 35, pale freckled face, short curly strawberry-blond hair, long straight nose, gray-green eyes, small oval glasses, inquisitive expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_6",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 58, dark brown skin, broad bald head, white close-trimmed beard, large dark eyes, rounded cheeks, patient steady expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_7",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 40, olive complexion, narrow heart-shaped face, shaved sides with dark wavy hair swept up, long eyebrows, bright brown eyes, alert expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ua_8",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 47, warm brown complexion, full round face, long black braid, small square glasses, strong rounded nose, gentle serious expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_3",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 46, light skin, long oval face, tightly curled copper hair cut above shoulders, broad nose bridge, gray eyes, slight asymmetric smile",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_4",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 50, tan complexion, broad square face, wavy black hair with white streak above one ear, long thin mustache, hazel eyes, measured expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_5",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 34, dark brown skin, angular face, closely cropped natural curls, arched eyebrows, small silver round glasses, bright analytical eyes",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_6",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 56, olive skin, long rectangular face, thick white wavy hair, broad black-gray beard, heavy brows, calm protective expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_7",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: female age 38, light golden skin, diamond face, short straight dark hair with a long side fringe, wide-set green eyes, prominent pointed chin, keen expression",
+      "series": "sources-v2"
+    },
+    {
+      "id": "general_ru_8",
+      "prompt": "Entirely original FICTIONAL strategy-game character portrait, not a real person and no resemblance to any public figure, politician or known military commander. Use a distinctly painterly illustrated graphic-novel style with visible brush shapes, moderately stylized anatomy and designed facial features, not photorealism. Square head-and-shoulders portrait, plain olive field jacket without military insignia, muted olive/slate palette, soft light upper left, dark slate painted backdrop. Full head visible, centered bust. No weapons, flags, rank insignia, medals, text, logo, UI or watermark. Unique character design: male age 45, pale skin, rounded triangular face, unruly auburn curls, short red beard, large round brown glasses, slightly crooked nose, gentle thoughtful expression",
+      "series": "sources-v2"
+    }
+  ]
+}
