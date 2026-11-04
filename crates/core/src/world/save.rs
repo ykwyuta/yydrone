@@ -804,6 +804,7 @@ impl World {
         w.economy(0.0);
         w.update_supply();
         w.update_vision();
+        w.refresh_command_situations(0);w.refresh_command_situations(1);
         w.owner_rev = w.owner_rev.wrapping_add(1);
         Ok(w)
     }

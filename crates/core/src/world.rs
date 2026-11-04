@@ -411,6 +411,7 @@ impl World {
         w.update_season();
         w.run_history();
         w.setup_initial_command();
+        w.refresh_command_situations(0);w.refresh_command_situations(1);
         w
     }
 
@@ -1231,6 +1232,8 @@ impl World {
             self.partisans();
         }
         if tk % 100 == 0 {
+            // 指揮AIが停止されている戦線も、実際の戦況は独立して更新する。
+            self.refresh_command_situations(0);self.refresh_command_situations(1);
             self.history.push((self.t, self.share(0)));
         }
         for s in &mut self.sides {

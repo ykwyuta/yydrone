@@ -117,16 +117,26 @@ impl Game {
         height: f32,
     ) -> bool {
         let c = GENERAL_COLORS[gi];
+        let (situation, request, budget) =
+            self.world
+                .as_ref()
+                .map_or((GeneralSituation::default(), false, 0.0), |w| {
+                    let budget = w.proposal_budget_needed(side, gi);
+                    (w.general_situation(side, gi), budget > 0.0, budget)
+                });
         // 地図上の都市ラベルなどをカードの下へ隠す。
         tq.0.retain(|(_, tx, ty, tw, th, _, _, _)| {
             *tx + *tw <= x || *tx >= x + width || *ty + *th <= y || *ty >= y + height
         });
+        // 要請マークを先に拾い、カード本体の「指示」より提案画面を優先する。
+        let help_clicked =
+            request && self.take_click(x + width - 36.0, y, x + width, y + 36.0) == Some(0);
         let clicked = self
             .button(g, tq, "", x, y, width, height, false, true)
             .is_some();
         g.rect_outline(x, y, x + width, y + height, 1.5, c);
         g.rect(x, y, x + 4.0, y + height, c);
-        let portrait = height - 12.0;
+        let portrait = 44.0;
         let tex = self
             .art
             .portrait_texture(g, side as usize * (GENERAL_COUNT + 1) + gi);
@@ -143,7 +153,7 @@ impl Game {
             format!("{} {}", gi + 1, GENERAL_NAMES[side as usize][gi]),
             x + portrait + 15.0,
             y + 4.0,
-            width - portrait - 20.0,
+            width - portrait - 20.0 - if request { 26.0 } else { 0.0 },
             22.0,
             Font::Normal,
             c,
@@ -151,21 +161,89 @@ impl Game {
         tq.add(
             format!("{} / {}部隊", doctrine.name(), count),
             x + portrait + 15.0,
-            y + 27.0,
+            y + 25.0,
             width - portrait - 20.0,
-            22.0,
+            18.0,
             Font::Small,
             TEXT,
         );
-        if clicked {
+        let color = match situation.situation {
+            Situation::Advancing | Situation::Advantage => [0.4, 0.95, 0.58, 1.0],
+            Situation::Retreating | Situation::Disadvantage => [1.0, 0.42, 0.36, 1.0],
+            Situation::Contested => [1.0, 0.82, 0.36, 1.0],
+            Situation::Unknown => [0.58, 0.63, 0.67, 1.0],
+        };
+        let (left, right, gy) = (x + portrait + 15.0, x + width - 46.0, y + height - 15.0);
+        let center = (left + right) / 2.0;
+        g.rect(left, gy, right, gy + 7.0, [0.04, 0.05, 0.06, 1.0]);
+        g.rect(left, gy, center, gy + 7.0, [0.45, 0.15, 0.12, 0.45]);
+        g.rect(center, gy, right, gy + 7.0, [0.12, 0.4, 0.2, 0.45]);
+        let position = left + (right - left) * situation.balance.clamp(0.0, 1.0);
+        if situation.situation != Situation::Unknown {
+            g.rect(
+                position.min(center),
+                gy,
+                position.max(center),
+                gy + 7.0,
+                color,
+            );
+        }
+        g.rect(
+            center - 0.7,
+            gy - 1.0,
+            center + 0.7,
+            gy + 8.0,
+            [0.8, 0.83, 0.8, 1.0],
+        );
+        g.circle(position, gy + 3.5, 3.0, 12, color);
+        tq.add(
+            situation.situation.name(),
+            x + width - 40.0,
+            y + height - 21.0,
+            36.0,
+            20.0,
+            Font::Small,
+            color,
+        );
+        if request {
+            let (hx, hy) = (x + width - 13.0, y + 13.0);
+            g.circle(hx, hy, 10.0, 24, [0.82, 0.2, 0.12, 1.0]);
+            g.ring(
+                hx,
+                hy,
+                10.0,
+                1.5,
+                24,
+                [1.0, 0.8, 0.35, 0.7 + 0.3 * (self.anim * 3.0).sin().abs()],
+            );
+            tq.add(
+                "!",
+                hx - 10.0,
+                hy - 10.0,
+                20.0,
+                20.0,
+                Font::NormalCenter,
+                [1.0; 4],
+            );
+        }
+        if crate::ui::inside(self.mouse, x, y, x + width, y + height) {
+            self.tip=Some(format!("担当戦況：{}\n直近約30秒の支配増減：{:+}タイル\n有効戦力 自軍 {:.1} / 確認敵 {:.1}\n5秒ごとに更新。未確認の敵は含みません。{}",situation.situation.name(),situation.territory_delta,situation.own_strength,situation.enemy_strength,if request{format!("\n増強要請：追加予算 {budget:.0}。! を押すと提案へ。")}else{String::new()}));
+        }
+        if clicked || help_clicked {
             self.command_general = gi;
             self.command_tab = 0;
-            self.command_detail_tab = if self.compact { 0 } else { 1 };
+            self.command_detail_tab = if help_clicked {
+                2
+            } else if self.compact {
+                0
+            } else {
+                1
+            };
             self.cam = (region.x, region.y);
             self.clamp_camera(g);
             self.toggle_command();
         }
-        clicked
+        clicked || help_clicked
     }
     pub(crate) fn draw_command_map(&mut self, g: &mut dyn Gfx, tq: &mut TextQ) {
         // 地域指定中はカードが地図へのタップを奪わないようにする。
@@ -214,7 +292,7 @@ impl Game {
             return;
         }
         let (x, y) = (sw - 252.0, top + if self.compact { 104.0 } else { 88.0 });
-        let capacity = ((bottom - y - if preview.is_some() { 68.0 } else { 0.0 } - 52.0) / 54.0)
+        let capacity = ((bottom - y - if preview.is_some() { 68.0 } else { 0.0 } - 52.0) / 70.0)
             .floor()
             .max(1.0) as usize;
         let per_page = capacity.min(if self.compact { 3 } else { GENERAL_COUNT });
@@ -222,7 +300,7 @@ impl Game {
         self.region_card_page = self.region_card_page.min(pages - 1);
         let start = self.region_card_page * per_page;
         let shown = active.len().saturating_sub(start).min(per_page);
-        let height = 26.0 + shown.max(1) as f32 * 54.0 + if pages > 1 { 26.0 } else { 0.0 };
+        let height = 26.0 + shown.max(1) as f32 * 70.0 + if pages > 1 { 26.0 } else { 0.0 };
         tq.0.retain(|(_, tx, ty, tw, th, _, _, _)| {
             *tx + *tw <= x || *tx >= sw - 12.0 || *ty + *th <= y || *ty >= y + height
         });
@@ -263,9 +341,9 @@ impl Game {
                 *count,
                 *doctrine,
                 x + 6.0,
-                y + 25.0 + row as f32 * 54.0,
+                y + 25.0 + row as f32 * 70.0,
                 228.0,
-                52.0,
+                68.0,
             ) {
                 return;
             }
@@ -315,11 +393,8 @@ impl Game {
             if sx + radius < 0.0 || sx - radius > sw || sy + radius < top || sy - radius > bottom {
                 continue;
             }
-            let (width, h) = (224.0, 56.0);
-            let mut candidates = vec![(
-                (sx - width / 2.0).clamp(8.0, sw - width - 8.0),
-                sy.clamp(top + 8.0, bottom - h - 8.0),
-            )];
+            let (width, h) = (224.0, 72.0);
+            let mut candidates = Vec::new();
             let columns = ((sw - 16.0) / (width + 8.0)).floor() as usize;
             let rows = ((bottom - top - 16.0) / (h + 8.0)).floor() as usize;
             for row in 0..rows {

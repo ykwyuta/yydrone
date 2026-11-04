@@ -348,6 +348,32 @@ fn disabled_controls_do_not_execute_headquarters_actions() {
 }
 
 #[test]
+fn general_card_gauge_and_reinforcement_help_link_work_on_desktop_and_phone() {
+    use yydrone_core::command::*;
+    for compact in [false,true] {
+        let (mut game,mut gfx)=game();game.compact=compact;game.touch=compact;
+        if compact{gfx.dimensions=Some((1000.0,480.0));}
+        let p=game.world.as_ref().unwrap().general_proposal(0,0).unwrap();assert!(p.budget>0.0);
+        let w=game.world.as_mut().unwrap();w.sides[0].command.proposals[0]=Some(p.clone());
+        w.sides[0].command.situations[0]=GeneralSituation{balance:0.2,situation:Situation::Retreating,territory_delta:-10,..Default::default()};
+        game.frame(&mut gfx,&[],0.0);
+        assert!(gfx.texts.iter().any(|(s,_,_,_,_)|s=="後退"),"gauge status label missing");
+        let (_,x,y,w,h)=gfx.texts.iter().find(|(s,_,_,_,_)|s=="!").expect("reinforcement help mark missing").clone();
+        let (x,y)=(x+w/2.0,y+h/2.0);
+        game.frame(&mut gfx,&[Ev::Down(0,x,y),Ev::Up(0,x,y)],0.0);
+        assert!(game.show_command);assert_eq!(game.command_general,0);assert_eq!(game.command_detail_tab,2);
+        game.show_command=false;
+        game.world.as_mut().unwrap().fund_general(0,0,p.budget).unwrap();
+        game.frame(&mut gfx,&[],0.0);
+        assert!(gfx.texts.iter().all(|(s,_,_,_,_)|s!="!"),"fulfilled request still shows help mark");
+        // 戦地変更だけの提案は増強要請として表示しない。
+        let w=game.world.as_mut().unwrap();w.sides[0].command.proposals[0].as_mut().unwrap().budget=0.0;
+        game.frame(&mut gfx,&[],0.0);
+        assert!(gfx.texts.iter().all(|(s,_,_,_,_)|s!="!"));
+    }
+}
+
+#[test]
 fn phone_top_bar_opens_headquarters_with_no_generals_and_while_producing_or_selecting() {
     for dimensions in [(900.0,420.0),(1000.0,480.0)] {
         for production in [false,true] {

@@ -5,6 +5,8 @@ use crate::world::*;
 use std::collections::VecDeque;
 mod proposals;
 mod deployment;
+mod situation;
+pub use situation::{GeneralSituation, Situation};
 pub use proposals::{GeneralProposal, ProposalPart};
 pub const GENERAL_COUNT: usize = 9;
 pub const DIRECT_COMMAND: u8 = GENERAL_COUNT as u8;
@@ -141,6 +143,10 @@ pub struct CommandState {
     pub proposals: [Option<GeneralProposal>; GENERAL_COUNT],
     pub proposal_t: f32,
     pub proposal_after: [f32; GENERAL_COUNT],
+    /// 地図カード用の派生情報。セーブには含めず、読込後に再集計する。
+    pub situations: [GeneralSituation; GENERAL_COUNT],
+    pub(crate) situation_regions: [Option<Region>; GENERAL_COUNT],
+    pub(crate) territory_samples: [VecDeque<(f32,u32)>; GENERAL_COUNT],
 }
 impl Default for CommandState {
     fn default() -> Self {
@@ -169,6 +175,9 @@ impl Default for CommandState {
             proposals: std::array::from_fn(|_| None),
             proposal_t: 5.0,
             proposal_after: [0.0; GENERAL_COUNT],
+            situations: [GeneralSituation::default(); GENERAL_COUNT],
+            situation_regions: [None; GENERAL_COUNT],
+            territory_samples: std::array::from_fn(|_|VecDeque::new()),
         }
     }
 }

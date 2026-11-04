@@ -1,5 +1,5 @@
 // Exercise the actual WASM/canvas UI in an isolated, installed headless Chromium.
-// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals | --touch | --deployment]
+// Usage: node tools/verify_command_ui.mjs [path/to/chrome.exe] [--tutorial | --proposals | --touch | --deployment | --gauges]
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
@@ -61,7 +61,29 @@ try {
   const clickText=async text=>{await waitFor(`window.__commandTexts.some(t=>t.text===${JSON.stringify(text)})`,text);const item=await evaluate(`window.__commandTexts.find(t=>t.text===${JSON.stringify(text)})`);await click(item.x+3,item.y+7);};
   const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'docs',`command-ui-${name}.png`),Buffer.from(data.data,'base64'));};
   const start=async(compact,width,height)=>{await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:origin+'/?compact='+Number(compact)});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'WASM load');await key('Enter','Enter',13);await key(' ','Space',32);await key('F3','F3',114);await waitFor(`window.__commandTexts.some(t=>t.text.includes('司令部 —'))`,'headquarters');};
-  if (process.argv.includes('--deployment')) {
+  if (process.argv.includes('--gauges')) {
+    const has=value=>`window.__commandTexts.some(t=>t.text.includes(${JSON.stringify(value)}))`;
+    const tap=async(x,y)=>{await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1,radiusX:3,radiusY:3,force:1}]});await sleep(90);await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await sleep(200);};
+    const tapText=async text=>{await waitFor(`window.__commandTexts.some(t=>t.text===${JSON.stringify(text)})`,text);const p=await evaluate(`(()=>{const t=window.__commandTexts.find(t=>t.text===${JSON.stringify(text)});const c=document.getElementById('ui'),r=c.getBoundingClientRect();return {x:r.left+(t.x+4)*r.width/c.width,y:r.top+(t.y+7)*r.height/c.height};})()`);await tap(p.x,p.y);};
+    await start(false,1600,900);await key('F3','F3',114);for(let i=0;i<3;i++)await key('+','Equal',187);
+    await waitFor(`window.__commandTexts.some(t=>t.text==='!')`,'reinforcement request mark');
+    await waitFor(`window.__commandTexts.some(t=>['前進','後退','優勢','劣勢','拮抗'].includes(t.text))`,'live regional gauge');
+    await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:800,y:890});await screenshot('gauges');
+    await clickText('!');await waitFor(has('追加予算'),'help opens general proposal');await screenshot('gauge-request');
+    await clickText('予算を承認');await clickText('閉じる');
+    const first=await evaluate(`window.__commandTexts.find(t=>t.text==='1 ヴェレス')`);
+    if(!first)throw new Error('First general card missing');
+    if(await evaluate(`window.__commandTexts.some(t=>t.text==='!'&&t.x>1348&&t.y>${first.y-5}&&t.y<${first.y+60})`))throw new Error('Approved reinforcement request still marked');
+    console.log('Desktop: live regional gauges, help links and fulfilled-request clearing passed');
+    await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});await send('Emulation.setDeviceMetricsOverride',{width:844,height:390,deviceScaleFactor:2,mobile:true});
+    await send('Page.navigate',{url:origin+'/?touch=1'});await waitFor(`document.getElementById('loading')?.classList.contains('hidden')`,'phone load');await tapText('作戦開始（2時間）');await tapText('作戦開始');
+    for(const speed of [1,2,4])await tapText('×'+speed);
+    await waitFor(`window.__commandTexts.some(t=>t.text==='!')`,'phone help mark');await screenshot('touch-gauges');
+    await tapText('!');await waitFor(has('追加予算'),'touch help opens proposal');await tapText('予算を承認');await tapText('閉じる');
+    for(let page=0;page<9;page++){if(await evaluate(has('9 イリス')))break;await tapText('次の担当');}
+    await waitFor(has('9 イリス'),'last general gauge page');await screenshot('touch-gauges-last');
+    console.log('Phone: visible gauges, real-touch help links, approval and portrait pagination passed');
+  } else if (process.argv.includes('--deployment')) {
     const names=['ヴェレス / 突破重視','ミラ / 兵力温存','オリク / 均衡調整','ルネ / 機甲集中','エダ / 火力優先','セイラ / 偵察重視','マルク / 守備重視','ノヴァ / 機動襲撃','イリス / 補給重視'];
     for(const [compact,width,height] of [[false,1600,900],[true,1000,480]]) {
       await start(compact,width,height);
@@ -147,7 +169,7 @@ try {
     await clickText('担当領域 OFF');const firstLegend=await evaluate(`window.__commandTexts.find(t=>t.text==='1 ヴェレス')`);if(!firstLegend)throw new Error('Missing first general in legend');await click(firstLegend.x+4,firstLegend.y+7);await waitFor(has('担当地域：'),'legend opens selected general');
     console.log('Desktop: proactive requests, preview, budget/theater approval, nine regions, legend and visibility toggle passed');
     await prepare(true,1000,480);await screenshot('compact-proposals');
-    await appointAll();await clickText('閉じる');await waitFor(has('担当 9人'),'compact nine territories');await screenshot('compact-territories');await clickText('次の担当');await clickText('次の担当');await waitFor(has('9 イリス'),'compact final portrait page');await screenshot('compact-territories-last');
+    await appointAll();await clickText('閉じる');await waitFor(has('担当 9人'),'compact nine territories');await screenshot('compact-territories');for(let page=0;page<9;page++){if(await evaluate(has('9 イリス')))break;await clickText('次の担当');}await waitFor(has('9 イリス'),'compact final portrait page');await screenshot('compact-territories-last');
     await clickText('担当領域 ON');await clickText('担当領域 OFF');
     console.log('Compact: proposal controls and all nine labeled territories passed');
   } else {

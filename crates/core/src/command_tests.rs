@@ -87,6 +87,76 @@ fn loading_or_training_does_not_reassign_initial_generals() {
 }
 
 #[test]
+fn general_gauge_uses_confirmed_strength_and_never_assumes_hidden_enemies_are_absent() {
+    let mut w=world();
+    w.sides[0].command.generals[0].region=Region{x:120.0,y:80.0,radius:8.0};
+    w.sides[0].command.generals[0].region_assigned=true;
+    let own=w.spawn(UK::Infantry,0,120.0,80.0);
+    w.vis[0].fill(0);w.refresh_command_situations(0);
+    let unknown=w.general_situation(0,0);
+    assert_eq!(unknown.situation,Situation::Unknown);assert_eq!(unknown.balance,0.5);
+    w.spawn(UK::Tank,1,124.0,80.0);w.refresh_command_situations(0);
+    assert_eq!(w.general_situation(0,0),unknown,"hidden enemy changed the gauge");
+    w.vis[0].fill(255);w.refresh_command_situations(0);
+    let weak=w.general_situation(0,0);
+    assert_eq!(weak.situation,Situation::Disadvantage);assert!(weak.balance<0.4);assert_eq!(weak.known_enemies,1);
+    for _ in 0..4 {w.spawn(UK::Tank,0,121.0,80.0);}
+    w.refresh_command_situations(0);
+    assert_eq!(w.general_situation(0,0).situation,Situation::Advantage);
+    let i=w.unit_index(own).unwrap();let before=w.general_situation(0,0).own_strength;
+    w.units[i].hp=def(UK::Infantry).hp*0.5;w.units[i].supplied=false;w.refresh_command_situations(0);
+    assert!(w.general_situation(0,0).own_strength<before,"damage and supply did not affect effective strength");
+    w.vis[0].fill(0);w.refresh_command_situations(0);
+    assert_eq!(w.general_situation(0,0).situation,Situation::Unknown);
+}
+
+#[test]
+fn general_gauge_tracks_recent_advances_retreats_and_resets_for_new_theaters() {
+    use crate::geo::tidx;
+    let mut w=world();let r=Region{x:120.0,y:80.0,radius:8.0};
+    w.sides[0].command.generals[0].region=r;w.sides[0].command.generals[0].region_assigned=true;
+    for y in 70..90 {for x in 110..130 {w.owner[tidx(x,y)]=1;}}
+    w.refresh_command_situations(0);
+    for x in 115..125 {w.owner[tidx(x,80)]=0;}
+    w.t=5.0;w.refresh_command_situations(0);
+    let advancing=w.general_situation(0,0);
+    assert_eq!(advancing.situation,Situation::Advancing);assert_eq!(advancing.territory_delta,10);assert!(advancing.balance>0.5);
+    for seconds in [10.0,15.0,20.0,25.0,30.0,35.0] {w.t=seconds;w.refresh_command_situations(0);}
+    for x in 115..125 {w.owner[tidx(x,80)]=1;}
+    w.t=40.0;w.refresh_command_situations(0);
+    let retreating=w.general_situation(0,0);
+    assert_eq!(retreating.situation,Situation::Retreating);assert_eq!(retreating.territory_delta,-10);assert!(retreating.balance<0.5);
+    w.sides[0].command.generals[0].region=Region{x:145.0,y:85.0,radius:8.0};
+    assert_eq!(w.general_situation(0,0).situation,Situation::Unknown,"stale theater status displayed after moving region");
+    w.refresh_command_situations(0);
+    assert_eq!(w.general_situation(0,0).territory_delta,0);
+    assert!(w.sides[0].command.territory_samples[0].len()<=8);
+}
+
+#[test]
+fn general_gauge_is_rebuilt_after_loading_without_false_territory_changes() {
+    let mut w=World::new(Settings{seed:5,duration:7200.0,ai_mult:1.0,player:Some(0)});
+    w.t=10.0;w.refresh_command_situations(0);
+    let loaded=World::load_bytes(&w.save_bytes()).unwrap();
+    for gi in 0..GENERAL_COUNT {
+        let status=loaded.general_situation(0,gi);
+        assert_eq!(status.territory_delta,0);assert_eq!(status.checked_at,10.0);
+        assert!(status.balance.is_finite()&&(0.0..=1.0).contains(&status.balance));
+    }
+}
+
+#[test]
+fn general_gauge_updates_every_five_seconds_even_when_command_ai_is_frozen() {
+    use crate::history::{Mod,ModKind};
+    let mut w=world();w.sides[0].command.generals[0].region_assigned=true;
+    w.refresh_command_situations(0);
+    w.mods.push(Mod{side:0,kind:ModKind::Frozen,zone:None,until:100000});
+    for _ in 0..100 {w.tick();}
+    assert!(w.is_frozen(0));
+    assert!(w.general_situation(0,0).checked_at>=4.9,"gauge froze together with the command AI");
+}
+
+#[test]
 fn legacy_v4_fixture_keeps_delegation_and_starts_proposals_later() {
     let w=World::load_bytes(include_bytes!("../tests/fixtures/legacy_v4.bin")).unwrap();
     assert_eq!(w.sides[0].command.generals[0].budget,100.0);
