@@ -297,6 +297,12 @@ pub extern "C" fn yy_frame(dt: f32) {
     });
 }
 
+/// Current screen for browser controls (independent of overlays and hit targets).
+#[no_mangle]
+pub extern "C" fn yy_is_title() -> u32 {
+    APP.with(|cell| cell.borrow().as_ref().map_or(1, |app| (app.game.screen == yydrone_game::Screen::Title) as u32))
+}
+
 /// タッチした場所に何があるか（実ピクセル）。0=地図 1=画面部品 2=押してすぐ反応 3=なぞれる一覧
 #[no_mangle]
 pub extern "C" fn yy_hit(x: f32, y: f32) -> u32 {

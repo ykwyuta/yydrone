@@ -769,6 +769,7 @@ async function main() {
     try {
       checkSize();
       wasm.yy_frame(dt);
+      window.yyBrowserRecovery?.setTitleScreen(wasm.yy_is_title() !== 0);
     } catch (e) {
       console.error(e);
       showError(String(e && e.stack ? e.stack : e));
