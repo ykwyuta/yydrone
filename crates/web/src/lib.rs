@@ -23,6 +23,7 @@ extern "C" {
     fn js_measure(p: *const u8, l: usize, f: u32) -> f32;
     fn js_measure_h(p: *const u8, l: usize, f: u32, w: f32) -> f32;
     fn js_fullscreen_toggle();
+    fn js_refresh_cache();
     fn js_save(slot: u32, p: *const u8, l: usize, mp: *const u8, ml: usize);
     fn js_load(slot: u32);
     fn js_slot_info(slot: u32, out: *mut u8, cap: usize) -> usize;
@@ -185,6 +186,13 @@ impl Gfx for WebGfx {
     fn toggle_fullscreen(&mut self) {
         unsafe { js_fullscreen_toggle() }
     }
+    fn can_refresh_cache(&self) -> bool {
+        cfg!(target_arch = "wasm32")
+    }
+    fn refresh_cache(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        unsafe { js_refresh_cache() }
+    }
     fn set_compact(&mut self, c: bool) {
         if self.compact != c {
             self.compact = c;
@@ -295,12 +303,6 @@ pub extern "C" fn yy_frame(dt: f32) {
         }
         app.game.frame(&mut app.gfx, &evs, dt);
     });
-}
-
-/// Current screen for browser controls (independent of overlays and hit targets).
-#[no_mangle]
-pub extern "C" fn yy_is_title() -> u32 {
-    APP.with(|cell| cell.borrow().as_ref().map_or(1, |app| (app.game.screen == yydrone_game::Screen::Title) as u32))
 }
 
 /// タッチした場所に何があるか（実ピクセル）。0=地図 1=画面部品 2=押してすぐ反応 3=なぞれる一覧

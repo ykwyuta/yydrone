@@ -230,6 +230,7 @@ const env = {
     return m;
   },
   js_measure_h: (p, l, f, w) => wrap(f, str(p, l), w).length * FONTS[f][0] * LINE,
+  js_refresh_cache: () => { window.yyBrowserRecovery?.refresh?.(); },
   js_fullscreen_toggle: () => {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else {
@@ -403,6 +404,7 @@ function pickFile() {
 }
 
 function showError(s) {
+  window.yyBrowserRecovery?.showFallback?.();
   loading.classList.remove('hidden');
   loadingMsg.innerHTML = '';
   const e = document.createElement('div');
@@ -769,7 +771,6 @@ async function main() {
     try {
       checkSize();
       wasm.yy_frame(dt);
-      window.yyBrowserRecovery?.setTitleScreen(wasm.yy_is_title() !== 0);
     } catch (e) {
       console.error(e);
       showError(String(e && e.stack ? e.stack : e));

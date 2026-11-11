@@ -1036,6 +1036,9 @@ impl Game {
     pub(crate) fn draw_help(&mut self, g: &mut dyn Gfx, tq: &mut TextQ, sw: f32, sh: f32) {
         let (x, y) = self.modal(g, sw, sh, 860.0, 560.0);
         tq.add("操作説明", x + 24.0, y + 14.0, 400.0, 30.0, Font::Big, ACCENT);
+        if g.can_refresh_cache() && self.button(g, tq, "キャッシュを更新して再読み込み", x + 460.0, y + 12.0, 260.0, 32.0, false, true).is_some() {
+            g.refresh_cache();
+        }
         tq.add(
             "【部隊】\n左クリック／左ドラッグ：選択（Shift で追加）\nダブルクリック：画面内の同じ種類を全部\n右クリック：交戦しつつ前進／敵の上で攻撃\nQ：移動のみ　G：地点攻撃　S：停止　H：固守\nZ：AI 将軍に委任（黄色の点）。命令すると解除\n部隊を選ぶと時間が止まり、命令か選択の解除で進む\nCtrl+数字：群に登録　数字：群を呼び出し\n\n【工兵】\nT：塹壕線　M：地雷原　B：竜の歯　P：浮橋\n（ドラッグで線を引く）\n\n【地図と時間】\n矢印キー・画面端・中ボタン：移動　ホイール：拡大縮小\nSpace：一時停止　＋／−：速度　F2：年表　F5：記録　F11：全画面\nCtrl＋＋／−：文字の大きさ\n\n【タッチ操作】\nタップ：選択／部隊を選んでいれば命令\n長押ししてなぞる：範囲選択　なぞる：地図の移動\n2本指：移動と拡大縮小",
             x + 24.0, y + 52.0, 400.0, 480.0, Font::Normal, TEXT,
