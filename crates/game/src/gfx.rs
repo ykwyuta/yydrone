@@ -38,6 +38,8 @@ pub trait Gfx {
     fn resize(&mut self, w: u32, h: u32);
     fn adjust_scale(&mut self, d: i32);
     fn toggle_fullscreen(&mut self);
+    fn can_refresh_cache(&self) -> bool { false }
+    fn refresh_cache(&mut self) {}
 
     // ---- 端末の機能（対応しない版は何もしない）
     /// タッチ向けの詰めた画面に切り替える
